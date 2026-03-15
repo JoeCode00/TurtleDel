@@ -39,16 +39,16 @@ SSH password is turtlebot4
 Exit the ssh py pressing ctrl+D.
 
 ## PC Packages
-sudo apt update && sudo apt install ros-jazzy-turtlebot4-desktop -y
-source /opt/ros/jazzy/setup.bash
+sudo apt update && sudo apt install ros-humble-turtlebot4-desktop -y
+source /opt/ros/humble/setup.bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export ROS_DOMAIN_ID=0
-sudo apt install ros-jazzy-teleop-twist-keyboard -y
-sudo apt-get install ros-jazzy-turtlebot4-viz -y
-sudo apt-get install ros-jazzy-turtlebot4-navigation -y
+sudo apt install ros-humble-teleop-twist-keyboard -y
+sudo apt-get install ros-humble-turtlebot4-viz -y
+sudo apt-get install ros-humble-turtlebot4-navigation -y
 
 1-liner
-sudo apt update && sudo apt install ros-jazzy-turtlebot4-desktop -y && source /opt/ros/jazzy/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp && export ROS_DOMAIN_ID=0 && sudo apt install ros-jazzy-teleop-twist-keyboard -y && sudo apt-get install ros-jazzy-turtlebot4-viz -y && sudo apt-get install ros-jazzy-turtlebot4-navigation -y
+sudo apt update && sudo apt install ros-humble-turtlebot4-desktop -y && source /opt/ros/humble/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp && export ROS_DOMAIN_ID=0 && sudo apt install ros-humble-teleop-twist-keyboard -y && sudo apt-get install ros-humble-turtlebot4-viz -y && sudo apt-get install ros-humble-turtlebot4-navigation -y
 
 ## Simple discovery server setup
 On the Ubuntu PC, run:
@@ -57,7 +57,7 @@ sudo touch /etc/turtlebot4/setup.bash
 sudo nano /etc/turtlebot4/setup.bash
 
 add the following lines
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 export ROS_DOMAIN_ID=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI=/etc/turtlebot4/cyclonedds_pc.xml
