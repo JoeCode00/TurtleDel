@@ -1,0 +1,11 @@
+Build:
+cd ~/ros2_ws
+colcon build --packages-select spiral_pattern
+source install/setup.bash
+
+Run:
+ros2 run turtlesim turtlesim_node
+THEN
+ros2 run spiral_pattern circle_node
+OR
+ros2 run spiral_pattern spiral_node
