@@ -253,6 +253,6 @@ source ~/.bashrc
 
 # Launch a Package
 ```bash
-source /home/joseph/ros2_ws/install/setup.bash
+source ~/ros2_ws/install/setup.bash
 ros2 launch <package_name> <launcher_name>.launch.py
 ```

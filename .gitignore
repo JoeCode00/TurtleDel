@@ -7,3 +7,6 @@ log/
 **/build/
 **/install/
 **/log/
+
+# VS Code workspace settings
+.vscode/

@@ -1,7 +1,5 @@
 # TurtleDel
 ## TurtleBot 4 Lite
-b
-
 All packages should be written first in Python, then optimizied if really necessary in C++.
 
 All parameters and topic names (input and outputs) should be specified in the launch file. This is opposed to storing parameters inside the node, .env file, or passing setup info from a topic.
@@ -120,3 +118,19 @@ ros2 topic list
 ```
 
 You should see the exact same list.
+
+## Simple TeleOp
+```bash
+sudo apt install ros-humble-teleop-twist-keyboard
+```
+Undock the robot
+```bash
+ros2 action send_goal /undock irobot_create_msgs/action/Undock {}
+```
+
+To run teleop, connect, source, and run this executable
+```bash
+nmcli connection up id "Turtlebot4"
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+ros2 topic pub --rate 15 --qos-reliability best_effort /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 2.0}}"
+```

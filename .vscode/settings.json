@@ -10,5 +10,8 @@
     "/opt/ros/humble/local/lib/python3.10/dist-packages",
     "${workspaceFolder}/basic_pkg"
   ],
-  "python.analysis.diagnosticMode": "workspace"
+  "python.analysis.diagnosticMode": "workspace",
+  "chat.tools.terminal.autoApprove": {
+    "ssh": true
+  }
 }
