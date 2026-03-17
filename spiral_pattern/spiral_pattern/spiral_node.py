@@ -7,6 +7,8 @@ class SpiralDraw(Node):
     def __init__(self):
         super().__init__('spiral_draw') 
         self.vel_pub = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
+        self.vel_bot_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.echo_pub = self.create_publisher(Twist, 'spiral_output', 10) # globally visible on /spiral_ns/spiral_echo_output
         self.vel = Twist()
         self.linear_velocity = 2.0 
         #^^ Only how fast circle is drawn, not how tight the spiral is. 
@@ -44,6 +46,9 @@ class SpiralDraw(Node):
             self.vel.linear.x = self.linear_velocity
             self.vel.angular.z = angular_velocity
             self.vel_pub.publish(self.vel)
+            self.vel_bot_pub.publish(self.vel)
+            # Echo the velocity values to the 'spiral_output' topic
+            self.echo_pub.publish(self.vel)
 
             # theta new = theta old + angular_velocity * time
             self.current_angle += angular_velocity * self.timer_period
@@ -56,6 +61,8 @@ class SpiralDraw(Node):
             self.vel.linear.x = 0.0
             self.vel.angular.z = 0.0
             self.vel_pub.publish(self.vel)
+            self.vel_bot_pub.publish(self.vel)
+            self.echo_pub.publish(self.vel)
 
 def main(args=None):
     rclpy.init(args=args)
