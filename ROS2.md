@@ -152,9 +152,7 @@ colcon build --symlink-install
 
 # Create a Node
 ```bash
-cd ~/ros2_ws/src/<package_name>
-mkdir scripts/
-cd scripts/
+cd ~/ros2_ws/src/<package_name>/<package_name>/
 touch <excecutable_name>.py
 chmod +x <excecutable_name>.py
 ```

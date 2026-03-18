@@ -20,6 +20,7 @@ ranges	float32[]	Array of distance measurements in meters. Values outside range_
 intensities	float32[]	Array of device-specific intensity values (often empty if not supported).
 
 ## Robot Connection
+<!-- 
 ## WIFI hosted by Turtlebot
 In ubuntu connect to Turtlebot4 with password Turtlebot4
 
@@ -39,26 +40,122 @@ nmcli connection up id "Turtlebot4" && ssh ubuntu@10.42.0.1
 ```
 
 SSH password is turtlebot4
-Exit the ssh py pressing ctrl+D.
+Exit the ssh py pressing ctrl+D. 
+-->
+## Pi setup
+
+
+The turtlebot is configured to connect to the Netgear router on turtlebot-hub-5G.
+Plug in the router.
+Connect Ubuntu to turtlebot-hub-5G, the password is **turtlebot4**.
+Turn on the turtlebot by placing it on the charger.
+Wait 30 seconds and then attempt to SSH into the pi at
+
+```bash
+ssh ubuntu@192.168.1.3
+```
+If the connection does not work, the IP may have changed. Connected to turtlebot-hub-5G, go to http://192.168.1.1 and input the following:
+Username: **admin**
+Password: **turtlebot4PW!**
+(Answers to security questions are also turtlebot4PW!)
+Go to Attached Devices and look for UBUNTU.
+
+If the router got reset, the Pi will continue to blindly look for turtlebot-hub-5G and the Create 3 will blindly look for turtlebot-hub both with password turtlebot4. Configure the router to these SSID and password to recover their IPs then reserve those IPs.
+
+In the rest of this document, I assume that the IP of the Pi will be 192.168.1.3 and the IP of the Create 3 will be 192.168.1.4, as it is reserved in the router.
+
+to SSH into the Pi, use
+```bash
+ssh ubuntu@192.168.1.3
+```
+the password is turtlebot4
+
+To use the Create 3 web portal, on the Ubuntu PC use a browser to go to 
+```
+192.168.1.3:8080
+```
+
+### Pi time sync setup (one-time)
+Add the PC as the preferred NTP source on the Pi:
+```bash
+ssh ubuntu@192.168.1.3
+```
+```bash
+sudo sed -i 's/^pool ntp.ubuntu.com.*/server 192.168.1.2 iburst prefer\n&/' /etc/chrony/chrony.conf
+sudo systemctl restart chrony
+```
+Exit SSH with ctrl+D.
+
+If there are timestamp errors (e.g. slam_toolbox dropping /scan messages), check Pi sync:
+```bash
+ssh ubuntu@192.168.1.3 'chronyc sources'
+```
+You should see `^* 192.168.1.2` with a non-zero Reach value.
+
+If needed, force a manual time set on the Pi:
+```bash
+ssh ubuntu@192.168.1.3 "sudo date -s '$(date -u "+%Y-%m-%d %H:%M:%S")'"
+ssh ubuntu@192.168.1.3 'sudo systemctl restart chrony'
+```
+
+### Create 3 time sync setup (one-time)
+On the Ubuntu PC web browser go to
+```bash
+http://192.168.1.3:8080/beta-ntp-conf
+```
+
+At the top of the document, add 
+```
+server 192.168.1.2 iburst prefer
+```
+Save the file using the button.
+
+In the top banner, hover "Beta Features", then click "Restart ntpd".
+
+This will allow timestamped topics to be published.
+
+## Time sync
+The Pi has no internet access and no RTC battery, so it loses its clock on reboot. The PC (192.168.1.2) acts as an NTP server using chrony, and the Pi syncs from it on boot.
+
+This is already configured. The Pi will sync within ~10 seconds of booting as long as the PC is on first.
+
 
 ## PC Packages
-```
+```bash
 sudo apt update && sudo apt install ros-humble-turtlebot4-desktop -y
 source /opt/ros/humble/setup.bash
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export ROS_DOMAIN_ID=0
 sudo apt install ros-humble-teleop-twist-keyboard -y
 sudo apt-get install ros-humble-turtlebot4-viz -y
 sudo apt-get install ros-humble-turtlebot4-navigation -y
+sudo apt install -y chrony
+sudo apt install -y ros-humble-teleop-twist-keyboard
+sudo systemctl disable --now systemd-timesyncd
 ```
-1-liner
+
+
+
+### PC chrony setup (one-time)
+Allow the local subnet to query the PC:
+```bash
+echo 'allow 192.168.1.0/24' | sudo tee -a /etc/chrony/chrony.conf
+sudo systemctl restart chrony
 ```
-sudo apt update && sudo apt install ros-humble-turtlebot4-desktop -y && source /opt/ros/humble/setup.bash && export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp && export ROS_DOMAIN_ID=0 && sudo apt install ros-humble-teleop-twist-keyboard -y && sudo apt-get install ros-humble-turtlebot4-viz -y && sudo apt-get install ros-humble-turtlebot4-navigation -y
+
+If ufw is enabled, allow NTP replies:
+```bash
+sudo ufw allow 123/udp
+sudo ufw reload
 ```
+
+Verify the PC is serving:
+```bash
+sudo chronyc clients
+```
+You should see 192.168.1.3 in the list.
 
 ## Simple discovery server setup
 On the Ubuntu PC, run:
-```
+```bash
 sudo apt update
 sudo apt install -y ros-humble-rmw-cyclonedds-cpp
 sudo mkdir /etc/turtlebot4/
@@ -67,40 +164,26 @@ sudo nano /etc/turtlebot4/setup.bash
 ```
 
 add the following lines
-
+```bash
 source /opt/ros/humble/setup.bash
 export ROS_DOMAIN_ID=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI=/etc/turtlebot4/cyclonedds_pc.xml
+```
 
 save and exit the file (ctrl+s, ctrl+x)
 On the Ubuntu PC, run:
-```
+```bash
 wget https://raw.githubusercontent.com/turtlebot/turtlebot4_setup/galactic/conf/cyclonedds_pc.xml && sudo mv cyclonedds_pc.xml /etc/turtlebot4/
 source /etc/turtlebot4/setup.bash
 source /opt/ros/humble/setup.bash
 ```
-Connect to the TurtleBot4
-```
-nmcli connection up id "Turtlebot4" && ssh ubuntu@10.42.0.1
-```
-SSH password is turtlebot4
-In a web browser, go to 10.42.0.1:8080
-In the top bar, got to Application and then Configuration
-If the "Enable Fast DDS discovery server?" box is checked, uncheck the box, press save, and restart the application.
 
-Now we are in the robot, run:
-```
-turtlebot4-setup
-```
-ROS Setup (enter) -> Discovery Server (enter)
-If Enabled is [True], set it as [False]
-esc 3 times to exit to terminal.
 
 
 ### Discovery server test:
 On the TurtleBot4, run:
-```
+```bash
 ros2 topic list
 ```
 You should see something like:
@@ -112,7 +195,7 @@ You should see something like:
 
 Exit the ssh via ctrl+D.
 On the Ubuntu PC, run:
-```
+```bash
 source /etc/turtlebot4/setup.bash
 ros2 topic list
 ```
@@ -120,17 +203,76 @@ ros2 topic list
 You should see the exact same list.
 
 ## Simple TeleOp
+The robot will not respond to /cmd_vel if it thinks it is docked.
+Check the docked status with the value of is_docked in:
 ```bash
-sudo apt install ros-humble-teleop-twist-keyboard
+ros2 topic echo /dock_status --once
 ```
-Undock the robot
+
+Undock the robot. It will back up and rotate CW 180 degrees.
 ```bash
 ros2 action send_goal /undock irobot_create_msgs/action/Undock {}
 ```
 
-To run teleop, connect, source, and run this executable
+Run the keyboard teleoperation node. Be careful, there is a >1 second motion delay.
 ```bash
-nmcli connection up id "Turtlebot4"
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+If it is not responding to this, try directly publishing to /cmd_vel:
+```bash
 ros2 topic pub --rate 15 --qos-reliability best_effort /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.0}, angular: {z: 2.0}}"
+```
+
+Dock the robot
+```bash
+ros2 action send_goal /dock irobot_create_msgs/action/Dock {}
+```
+
+## Scan
+The relevant parts of https://turtlebot.github.io/turtlebot4-user-manual/software/sensors.html#rplidar-a1m8
+
+Check if the PC can hear /scan.
+```bash
+ros2 topic echo /scan
+```
+
+If /scan does not have data within 5 seconds, run:
+```bash
+ros2 topic info /scan
+```
+
+If there are no publishers, check if the node /rplidar_composition is listed.
+```bash
+ros2 topic list
+```
+
+If /rplidar_composition is not listed, SSH into the Pi and launch the rplidar.
+```bash
+ssh ubuntu@192.168.1.3
+```
+the password is turtlebot4
+```bash
+ros2 launch turtlebot4_bringup rplidar.launch.py
+```
+Exit SSH with ctrl+D.
+Retstart this section to check if the PC can see /scan
+
+## SLAM Mapping
+Relevant sections of https://turtlebot.github.io/turtlebot4-user-manual/tutorials/generate_map.html#generating-a-map
+
+Make sure that the PC can see /odom (may take up to a minute to get data)
+```bash
+ros2 topic echo /odom
+```
+If there is no data or topic, go back to the section on Create 3 time setup, as there may be a desync.
+
+On the Ubuntu PC, Create /map via slam.launch.py that subscribes to /scan
+```bash
+ros2 launch turtlebot4_navigation slam.launch.py
+```
+
+Visualize /map via rviz
+```bash
+ros2 launch turtlebot4_viz view_robot.launch.py
 ```
