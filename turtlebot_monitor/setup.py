@@ -4,7 +4,7 @@ import os
 from setuptools import setup
 from glob import glob
 
-package_name = 'basic_pkg' #(1/2)
+package_name = 'turtlebot_monitor' #(1/2)
 
 setup(
     name=package_name,
@@ -25,7 +25,7 @@ setup(
     license='Apache 2.0',
     entry_points={
         'console_scripts': [
-          "basic_exec = basic_pkg.basic_exec:main",
+                    "monitor_exec = turtlebot_monitor.monitor_exec:main",
         ],
     },
 )

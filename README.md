@@ -124,6 +124,7 @@ This is already configured. The Pi will sync within ~10 seconds of booting as lo
 ```bash
 sudo apt update && sudo apt install ros-humble-turtlebot4-desktop -y
 source /opt/ros/humble/setup.bash
+sudo apt install ros-humble-turtlebot4-msgs -y
 sudo apt install ros-humble-teleop-twist-keyboard -y
 sudo apt-get install ros-humble-turtlebot4-viz -y
 sudo apt-get install ros-humble-turtlebot4-navigation -y

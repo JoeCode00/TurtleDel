@@ -7,10 +7,10 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='basic_pkg', #(1/7)
-            executable='basic_exec', #(2/7)
-            name='basic_node', #(3/7)
-            namespace='basic_ns',  #(4/7)
+            package='turtlebot_monitor', #(1/7)
+            executable='monitor_exec', #(2/7)
+            name='monitor_node', #(3/7)
+            namespace='monitor_ns',  #(4/7)
             parameters=[{
                 'basic_param': 'basic_value', #(5/7)
 						    #fill with dict of parameters
