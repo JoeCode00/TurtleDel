@@ -46,5 +46,7 @@ The Turtlebot 4 Lite runs on ROS 2 (typically Humble or Galactic). By default, i
    Once satisfied with the map, save it using the `nav2_map_server`:
 
    ```bash
-   ros2 run nav2_map_server map_saver_cli -f ~/my_new_map
+   ros2 run nav2_map_server map_saver_cli -f /home/aavanloon/ros2_ws/src/TurtleDel/map_name
    ```
+
+   To use this map again later for navigation, you will pass the path of the YAML file to the Nav2 map server, typically by adding `map:=$HOME/my_new_map.yaml` as an argument when starting your TurtleBot4's navigation launch file.

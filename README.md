@@ -277,3 +277,8 @@ Visualize /map via rviz
 ```bash
 ros2 launch turtlebot4_viz view_robot.launch.py
 ```
+
+Once satisfied with the map, save it using the `nav2_map_server`:
+```bash
+ros2 run nav2_map_server map_saver_cli -f /home/aavanloon/ros2_ws/src/TurtleDel/map_name
+```
