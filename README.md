@@ -285,7 +285,6 @@ ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name:
   {data: 'map_name'}}"
 ```
 **Note:**  
-
 If you are using namespacing, you will need to call the map saver tool directly:
 ```bash
 ros2 run nav2_map_server map_saver_cli -f ~/src/TurtleDel/map_name
@@ -295,17 +294,14 @@ or generally
 ros2 run nav2_map_server map_saver_cli -f "map_name" --ros-args -p map_subscribe_transient_local:=true -r __ns:=/namespace
 ```
 **What gets generated?**  
-
 The command creates two files in your current directory:
-- "map_name".pgm: The actual image of the map (Occupancy Grid), which can be viewed in an image editor. Black = Obstacles, White = Free Space, Gray = Unknown.
-- "map_name".yaml: The metadata containing the resolution (m/pixel) and origin. You can edit this file to adjust the map parameters
+- `"map_name".pgm`: The actual image of the map (Occupancy Grid), which can be viewed in an image editor. Black = Obstacles, White = Free Space, Gray = Unknown.
+- `"map_name".yaml`: The metadata containing the resolution (m/pixel) and origin. You can edit this file to adjust the map parameters
 
 **Troubleshooting**  
-
 - If the map is not saving, ensure that the ```bash /slam_toolbox/save_map ``` service is active by running ```bash ros2 service list ```
 
 - If your map is empty, check if you have sourced your ROS 2 environment ( ```bash source /opt/ros/humble/setup.bash ```).
 
 **Reusing for Navigation**  
-
 - To use this map again later for navigation, you will pass the path of the YAML file to the Nav2 map server, typically by adding `map:=$HOME/my_new_map.yaml` as an argument when starting your TurtleBot4's navigation launch file.
