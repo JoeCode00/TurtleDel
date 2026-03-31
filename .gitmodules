@@ -1,3 +1,0 @@
-[submodule "cartographer_turtlebot"]
-	path = cartographer_turtlebot
-	url = https://github.com/cartographer-project/cartographer_turtlebot.git
