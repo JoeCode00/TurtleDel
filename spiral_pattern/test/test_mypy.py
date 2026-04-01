@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ament_mypy.main import main
+from ament_mypy.main import main # type: ignore
 import pytest
 
 
