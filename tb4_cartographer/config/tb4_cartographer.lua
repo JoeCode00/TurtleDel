@@ -37,10 +37,26 @@ MAP_BUILDER.use_trajectory_builder_2d = true
 TRAJECTORY_BUILDER_2D.min_range = 0.12  -- Minimum range for the rangefinder (in meters)
 TRAJECTORY_BUILDER_2D.max_range = 8.0  -- Maximum range for the rangefinder (in meters)
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 8.5  -- Length of rays for missing data (in meters)
-TRAJECTORY_BUILDER_2D.use_imu_data = true  -- Whether to use IMU data
-TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true  -- Enable online correlative scan matching
-TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.linear_search_window = 0.1  -- Linear search window for scan matching (in meters)
-TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.translation_delta_cost_weight = 10.  -- Weight for translation delta cost
-TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_weight = 1e-1  -- Weight for rotation delta cost
+TRAJECTORY_BUILDER_2D.use_imu_data = false  -- Disable IMU requirement when IMU topic is unavailable
+
+-- More definite map cells: default hit=0.55/miss=0.49 requires many passes to
+-- commit a cell. Raising hit and lowering miss makes obstacles appear crisply
+-- after fewer scans and free space clears faster.
+TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.probability_grid_range_data_inserter.hit_probability = 0.7
+TRAJECTORY_BUILDER_2D.submaps.range_data_inserter.probability_grid_range_data_inserter.miss_probability = 0.35
+-- Disable the correlative (brute-force window search) scan matcher.
+-- This runs BEFORE ceres and can relocate the pose regardless of ceres weights.
+-- With it off, LIDAR is used only to paint the map, not to correct position.
+TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = false
+
+-- Odom-locked mode: ceres odom prior weights set to 1e9 (effectively infinite).
+-- The occupied_space residual (LIDAR) weight is 1 by default, so odom wins by
+-- a factor of 1,000,000,000. The pose will not deviate from odom at all.
+TRAJECTORY_BUILDER_2D.ceres_scan_matcher.translation_weight = 1e9
+TRAJECTORY_BUILDER_2D.ceres_scan_matcher.rotation_weight = 1e9
+
+-- Disable global pose graph optimization (loop closures) entirely.
+-- map→odom transform is never updated; /odom is locked to the world origin.
+POSE_GRAPH.optimize_every_n_nodes = 0
 
 return options
