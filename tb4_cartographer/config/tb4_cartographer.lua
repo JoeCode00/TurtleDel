@@ -8,10 +8,11 @@ options = {
   trajectory_builder = TRAJECTORY_BUILDER,  -- Reference to the trajectory builder configuration
   map_frame = "map",  -- Frame ID for the map
   tracking_frame = "base_link",  -- Frame ID for the robot base to track
-  published_frame = "odom",  -- Frame ID for publishing poses
+  published_frame = "odom",  -- Frame Cartographer reads the TF chain from (odom→base_link→laser)
   odom_frame = "odom",  -- Frame ID for odometry data
   provide_odom_frame = false,  -- Whether to provide an odometry frame
   publish_frame_projected_to_2d = true,  -- Whether to project the published frame to 2D
+  publish_to_tf = false,  -- Do NOT let Cartographer write map→odom to TF; the static publisher owns that
   use_odometry = true,  -- Whether to use odometry data
   use_nav_sat = false,  -- Whether to use GPS data
   use_landmarks = false,  -- Whether to use landmarks for localization
@@ -35,7 +36,7 @@ MAP_BUILDER.use_trajectory_builder_2d = true
 
 -- Configure 2D trajectory builder parameters
 TRAJECTORY_BUILDER_2D.min_range = 0.12  -- Minimum range for the rangefinder (in meters)
-TRAJECTORY_BUILDER_2D.max_range = 8.0  -- Maximum range for the rangefinder (in meters)
+TRAJECTORY_BUILDER_2D.max_range = 2  -- Maximum range for the rangefinder (in meters)
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 8.5  -- Length of rays for missing data (in meters)
 TRAJECTORY_BUILDER_2D.use_imu_data = false  -- Disable IMU requirement when IMU topic is unavailable
 
