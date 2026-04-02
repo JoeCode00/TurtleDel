@@ -65,11 +65,15 @@ class rfid_node_class(Node): # change node class name to <node_class>
                 self.get_logger().info(f'Output: {str(output_msg)}')
         except Exception as e:
             self.get_logger().info(f'Error: {str(e)}')
-            raise e
+            # raise e
 def main(args=None):
     rclpy.init(args=args)
-    node = rfid_node_class()
-    rclpy.spin(node)
+    while True:
+        try:
+            node = rfid_node_class()
+            rclpy.spin(node)
+        except KeyboardInterrupt:
+            break
     rclpy.shutdown()
     
 if __name__ == '__main__':
