@@ -87,5 +87,9 @@ ros2 action send_goal /dock irobot_create_msgs/action/Dock {}
 ```bash
 ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/hw4_map.yaml
 ```
+ <!-- todo change localization launch topic from /scan to /scan_masked -->
+
+
+ros2 launch turtlebot4_navigation nav2.launch.py
 
 Use 2d pose estimate to initially place the robot.
