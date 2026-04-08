@@ -131,6 +131,7 @@ sudo apt-get install ros-humble-turtlebot4-viz -y
 sudo apt-get install ros-humble-turtlebot4-navigation -y
 sudo apt install -y chrony
 sudo apt install -y ros-humble-teleop-twist-keyboard
+sudo apt install ros-humble-irobot-create-msgs -y
 sudo systemctl disable --now systemd-timesyncd
 ```
 

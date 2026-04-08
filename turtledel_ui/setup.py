@@ -25,7 +25,7 @@ setup(
     license='Apache 2.0',
     entry_points={
         'console_scripts': [
-          "ui_exec = turtledel_ui.ui_exec:main",
+          "ui_exec_terminal = turtledel_ui.ui_exec_terminal:main",
         ],
     },
 )

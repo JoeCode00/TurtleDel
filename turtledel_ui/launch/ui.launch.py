@@ -8,7 +8,7 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='turtledel_ui', #(1/7)
-            executable='ui_exec', #(2/7)
+            executable='ui_exec_terminal', #(2/7)
             name='ui_node', #(3/7)
             namespace='',  #(4/7)
             parameters=[{

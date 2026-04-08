@@ -133,14 +133,14 @@ class ui_node_class(Node): # change node class name to <node_class>
     def estimate_button_width(self, label: str, char_width = 8, padding = 16) -> int:
         return len(label) * char_width + padding
 
-    def submit_callback(sender, app_data):
+    def submit_callback(self, sender, app_data):
         user_input = dpg.get_value("input_field")
         dpg.add_text(f"> {user_input}", parent="output_terminal")
         dpg.set_y_scroll("output_terminal", -1.0)
         dpg.set_value("input_field", "")
         dpg.focus_item("input_field")
 
-    def interupt_callback(sender, app_data):
+    def interupt_callback(self, sender, app_data):
         dpg.add_text("Interupt", parent="output_terminal")
         dpg.set_y_scroll("output_terminal", -1.0)
         dpg.set_value("input_field", "")

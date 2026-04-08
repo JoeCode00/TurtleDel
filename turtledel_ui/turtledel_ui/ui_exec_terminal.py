@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import array
 import os
 import re
 import sys
@@ -10,18 +11,23 @@ import shlex
 import queue
 import threading
 import subprocess
+from datetime import datetime, timezone
 
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from sensor_msgs.msg import BatteryState, LaserScan, Image
+from geometry_msgs.msg import Twist
+from diagnostic_msgs.msg import DiagnosticArray
+from nav_msgs.msg import Odometry
+from irobot_create_msgs.msg import HazardDetectionVector, DockStatus
+
 try:
     import dearpygui.dearpygui as dpg
 except:
     raise ImportError("pip install dearpygui")
 
 node_name = 'ui_node'
-input_msg_type = String
-output_msg_type = String
 
 relative_input_topic = 'input'
 relative_output_topic = 'output'
@@ -100,6 +106,8 @@ class TerminalProcess:
         buf = b""
         try:
             while True:
+                if not isinstance(self._master_fd, int):
+                    continue
                 try:
                     r, _, _ = select.select([self._master_fd], [], [], 0.1)
                 except (ValueError, OSError):
@@ -116,24 +124,27 @@ class TerminalProcess:
                         line, buf = buf.split(b'\n', 1)
                         text = _strip_ansi(line.decode('utf-8', errors='replace').rstrip('\r'))
                         self.output_queue.put((self.terminal_tag, text))
-                elif self.process.poll() is not None:
+                elif self.process is not None and self.process.poll() is not None:
                     break
         finally:
             if buf:
                 text = _strip_ansi(buf.decode('utf-8', errors='replace').rstrip('\r'))
                 if text:
                     self.output_queue.put((self.terminal_tag, text))
-            try:
-                os.close(self._master_fd)
-            except OSError:
-                pass
-            rc = self.process.wait()
-            self.output_queue.put((self.terminal_tag, f"[exited: {rc}]"))
+            if self._master_fd is not None:
+                try:
+                    os.close(self._master_fd)
+                except OSError:
+                    pass
+            if self.process is not None:
+                rc = self.process.wait()
+                self.output_queue.put((self.terminal_tag, f"[exited: {rc}]"))
 
     def interrupt(self):
         if self.is_running():
             try:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
+                if self.process is not None:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGINT)
             except ProcessLookupError:
                 pass
 
@@ -159,7 +170,7 @@ class ui_node_class(Node):
         dpg.create_viewport(title='TurtleDel',
                             width=self.viewport_width,
                             height=self.viewport_height,
-                            x_pos=0,
+                            x_pos=2560,
                             y_pos=0,
                             decorated=False,
                             )
@@ -206,24 +217,22 @@ class ui_node_class(Node):
                                                callback=self.restart_callback,
                                                )
                                 dpg.add_text("TurtleDel: Group 2 User Interface")
-                            dpg.add_text("System Status:")
+                            dpg.add_text("System State:")
                             
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for status_prefix in ["WIFI", "RPI", "C3"]:
-                                    self.status_indicator(status_prefix, self)
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for status_prefix in ["Batt", "Diag", "Hazard", "Docked"]:
-                                    self.status_indicator(status_prefix, self)
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for status_prefix in ["/scan", "/scan_masked", "/odom", "/rfid", "/oakd"]:
-                                    self.status_indicator(status_prefix, self)
-                            
+                            status_rows = [["WIFI", "RaspberryPi", "Create3"],
+                                           ["/battery_state", "/diagnostics_agg", "/hazard_detection"],
+                                           ["/dock_status", "/scan", "/scan_masked", "/odom", "/rfid"],
+                                           ["/oakd", "/cmd_vel"],
+                                           ]
+                            for row in status_rows:
+                                with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                    for status_prefix in row:
+                                        self.status_indicator(status_prefix, self)
 
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
-                            dpg.add_text("Hello, world")
+                            dpg.add_text("System Startup:")
                             dpg.add_button(label="Save", width=-1)
-                            dpg.add_input_text(label="string", default_value="Quick brown fox", width=-1)
-                            dpg.add_slider_float(label="float", default_value=0.273, max_value=1, width=-1)
+                            
 
                 dpg.add_spacer(height=col_gap//4)
                 with dpg.child_window(tag="bottom_window",
@@ -247,29 +256,69 @@ class ui_node_class(Node):
 
         dpg.setup_dearpygui()
         dpg.show_viewport()
-
-        self.node_subscriber_ = self.create_subscription(
-            msg_type=input_msg_type,
-            topic=relative_input_topic,
-            callback=self.subscriber_callback,
-            qos_profile=qos
+        
+        self.battery_state = self.topic_monitor(self, 
+            msg_type=BatteryState,
+            topic="/battery_state",
             )
 
-        self.node_publisher_ = self.create_publisher(
-            msg_type=output_msg_type,
-            topic=relative_output_topic,
-            qos_profile=qos
+        self.diagnostics_agg = self.topic_monitor(self,
+            msg_type=DiagnosticArray,
+            topic="/diagnostics_agg",
+            )
+
+        self.hazard_detection = self.topic_monitor(self,
+            msg_type=HazardDetectionVector,
+            topic="/hazard_detection",
+            )
+        
+        self.dock_status = self.topic_monitor(self,
+            msg_type=DockStatus,
+            topic="/dock_status",
+            )
+        
+        self.scan = self.topic_monitor(self,
+            msg_type=LaserScan,
+            topic="/scan",
+            )
+        
+        self.scan_masked = self.topic_monitor(self,
+            msg_type=LaserScan,
+            topic="/scan_masked",
+            )
+        
+        self.odom = self.topic_monitor(self,
+            msg_type=Odometry,
+            topic="/odom",
+            )
+        
+        self.rfid = self.topic_monitor(self,
+            msg_type=String,
+            topic="/rfid",
+            )
+
+        self.oakd = self.topic_monitor(self,
+            msg_type=Image,
+            topic="/oakd/rgb/preview/image_raw",
+            tag="/oakd"
+            )
+        
+        self.cmd_vel = self.topic_monitor(self,
+            msg_type=Twist,
+            topic="/cmd_vel",
             )
 
         self.create_timer(0.05, self.timer_callback)
 
         self.create_timer(1, self.ip_callback)
+        
+        self.create_timer(1, self.monitor_health_callback)
 
     class status_indicator():
         def __init__(self, staus_prefix, node):
             radius=6
             with dpg.group(horizontal=True, horizontal_spacing=node.padding):
-                with dpg.drawlist(width=2*radius, height=2.6*radius):
+                with dpg.drawlist(width=int(2*radius), height=int(2.6*radius)):
                     dpg.draw_circle(tag=f"{staus_prefix}_status",
                                     center=(radius, 1.6*radius), 
                                     radius=radius, 
@@ -304,8 +353,9 @@ class ui_node_class(Node):
     def _terminal_print(self, text: str, terminal_tag: str = "output_terminal"):
         def _copy(sender, app_data):
             label = dpg.get_item_label(sender)
-            dpg.set_clipboard_text(label[2:] if label.startswith("> ") else label)
-            dpg.set_value(sender, False)
+            if label is not None:
+                dpg.set_clipboard_text(label[2:] if label.startswith("> ") else label)
+                dpg.set_value(sender, False)
         dpg.add_selectable(label=text, span_columns=True, parent=terminal_tag, callback=_copy)
         dpg.set_y_scroll(terminal_tag, -1.0)
 
@@ -324,18 +374,19 @@ class ui_node_class(Node):
 
     def ping_check(self):
         addresses = [["WIFI", "1"],
-                     ["C3", "2"],
-                     ["RPI", "3"]]
-        result = subprocess.run(
-            ["ping", "-c", "1", "-W", "1", "192.168.1.3"],
-            capture_output=True
-        )
-        alive = result.returncode == 0
-        color = GREEN if alive else RED
-        # DearPyGui is not thread-safe, so use configure_item carefully
-        # or post to a queue and update in timer_callback instead
-        dpg.configure_item("RPI_status", color=color, fill=color)
-
+                     ["Create3", "2"],
+                     ["RaspberryPi", "3"]]
+        for set in addresses:
+            connection_prefix = set[0]
+            ip_end = set[1]
+            result = subprocess.run(
+                ["ping", "-c", "1", "-W", "1", f"192.168.1.{ip_end}"],
+                # ["ping", "-c", "1", "-W", "1", f"8.8.8.8"],
+                capture_output=True
+            )
+            alive = result.returncode == 0
+            color = GREEN if alive else RED
+            dpg.configure_item(f"{connection_prefix}_status", color=color, fill=color)
 
     def submit_callback(self, sender, app_data):
         prefix = dpg.get_item_alias(sender).replace("_input_field", "")
@@ -358,12 +409,138 @@ class ui_node_class(Node):
         self._terminal_print("[interrupted]", output_tag)
         dpg.focus_item(input_tag)
 
-    def subscriber_callback(self, input_msg: input_msg_type):
-        self.get_logger().info(f'Input: {str(input_msg)}')
-        output_msg = output_msg_type()
-        output_msg = input_msg
-        self.node_publisher_.publish(output_msg)
-        self.get_logger().info(f'Output: {str(output_msg)}')
+    # def subscriber_callback(self, input_msg: input_msg_type):
+    #     self.get_logger().info(f'Input: {str(input_msg)}')
+    #     output_msg = output_msg_type()
+    #     output_msg = input_msg
+    #     self.node_publisher_.publish(output_msg)
+    #     self.get_logger().info(f'Output: {str(output_msg)}')
+
+    def monitor_health_callback(self):
+        """Check if topic monitors are receiving data within their max_interval_s threshold."""
+        monitors = [
+            self.hazard_detection,
+            self.dock_status,
+            self.scan,
+            self.scan_masked,
+            self.odom,
+            self.rfid,
+            self.oakd,
+            self.cmd_vel,
+            ]
+        
+        current_time = datetime.now(tz=timezone.utc)
+        
+        for monitor in monitors:
+            if monitor.old_timestamp is None:
+                monitor.is_alive = False
+            else:
+                elapsed = (current_time - monitor.old_timestamp).total_seconds()
+                monitor.is_alive = elapsed < monitor.max_interval_s
+            if monitor.is_good and monitor.is_alive:
+                color = GREEN
+            elif monitor.is_alive:
+                color = YELLOW 
+            else:
+                color = RED
+            dpg.configure_item(f"{monitor.tag}_status", color=color, fill=color)
+    
+    class topic_monitor():
+        def __init__(self, node, msg_type, topic, tag = None, qos_profile = 10, max_interval_s = 10):
+            self.subscription = node.create_subscription(
+                msg_type=msg_type,
+                topic=topic,
+                callback=self.subscription_callback,
+                qos_profile=qos_profile
+                )
+            
+            self.topic = topic
+            if tag is None:
+                self.tag = self.topic
+            else:
+                self.tag = tag
+
+            self.input_msg = None
+            self.max_interval_s = max_interval_s
+            self.old_timestamp = None
+            self.current_timestamp = None
+            self.time_delta = None
+            self.is_alive = False
+            self.is_good = False
+
+        def subscription_callback(self, input_msg):
+            self.input_msg = input_msg
+            self.is_alive = self.topic_is_alive()
+            if self.is_alive:
+                self.is_good = self.topic_is_good()
+            else:
+                self.is_good = False
+            
+        def topic_is_alive(self):
+            self.current_timestamp = datetime.now(tz=timezone.utc) # could get this from header
+
+            if self.old_timestamp is None:
+                self.old_timestamp = self.current_timestamp
+                self.time_delta = 0.0
+                return True
+
+            self.time_delta = self.seconds_between(self.old_timestamp, self.current_timestamp)
+            self.old_timestamp = self.current_timestamp
+            return self.time_delta < self.max_interval_s
+
+        def topic_is_good(self):
+            match self.topic:
+                case '/battery_state':
+                    if not isinstance(self.input_msg, BatteryState):
+                        return False
+                    percentage = self.input_msg.percentage
+                    return percentage > 20
+                case '/diagnostics_agg':
+                    if not isinstance(self.input_msg, DiagnosticArray):
+                        return False
+                    statuses = self.input_msg.status
+                    if not statuses:
+                        return False
+                    for status in statuses:
+                        if status.level != 0:
+                            return False
+                    return True
+                    
+                case "/hazard_detection":
+                    if not isinstance(self.input_msg, HazardDetectionVector):
+                        return False
+                    detections = self.input_msg.detections
+                    if len(detections) > 0:
+                        return False
+                    return True
+                    
+                case "/dock_status":
+                    if not isinstance(self.input_msg, DockStatus):
+                        return False
+                    return not self.input_msg.is_docked
+                    
+                case "/scan":
+                    if not isinstance(self.input_msg, LaserScan): 
+                        return False
+                    ranges = self.input_msg.ranges
+                    return isinstance(ranges, array.array)
+                    
+                case "/scan_masked":
+                    if not isinstance(self.input_msg, LaserScan):
+                        return False
+                    ranges = self.input_msg.ranges
+                    return isinstance(ranges, array.array)
+                    
+                case "/odom": return isinstance(self.input_msg, Odometry)
+                        
+                case "/rfid": return isinstance(self.input_msg, String)
+
+                case "/oakd/rgb/preview/image_raw": return isinstance(self.input_msg, Image)
+            
+                case '/cmd_vel': return isinstance(self.input_msg, Twist)
+
+        def seconds_between(self, older: datetime, newer: datetime) -> float:
+            return (newer - older).total_seconds()
 
     def timer_callback(self):
         try:
