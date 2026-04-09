@@ -156,7 +156,7 @@ class ui_node_class(Node):
 
         self.status_prefixes = ["/battery_state", "/diagnostics_agg", 
                         #    "/hazard_detection", 
-                            "/scan", "/scan_masked", "/odom", "/imu", "/tf","/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+                            "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
@@ -375,11 +375,6 @@ class ui_node_class(Node):
             topic="/scan",
             )
         
-        self.scan_masked = self.topic_monitor(self,
-            msg_type=LaserScan,
-            topic="/scan_masked",
-            )
-        
         self.odom = self.topic_monitor(self,
             msg_type=Odometry,
             topic="/odom",
@@ -393,6 +388,11 @@ class ui_node_class(Node):
         self.tf = self.topic_monitor(self,
             msg_type=TFMessage,
             topic="/tf",
+            )
+        
+        self.scan_masked = self.topic_monitor(self,
+            msg_type=LaserScan,
+            topic="/scan_masked",
             )
         
         self.rfid = self.topic_monitor(self,
@@ -569,10 +569,10 @@ class ui_node_class(Node):
             self.diagnostics_agg,
             # self.hazard_detection,
             self.scan,
-            self.scan_masked,
             self.odom,
             self.imu,
             self.tf,
+            self.scan_masked,
             self.rfid,
             self.oakd,
             self.dock_status,
@@ -674,10 +674,11 @@ class ui_node_class(Node):
                     statuses = self.input_msg.status
                     if not statuses:
                         return False
-                    _ignore_patterns = ('joystick', 'frequency too low', 'frequency too high', 'no events recorded', 'stale', 'battery')
+                    _ignore_patterns = ('joystick', 'frequency too low', 'frequency too high', 'no events recorded', 'stale', 'battery',
+                                        'undocked', 'docked', 'no hazards detected', 'enabled', 'hazard detection', 'wheel status', 'dock status')
                     for status in statuses:
                         level = status.level if isinstance(status.level, int) else ord(status.level)
-                        if level not in (0, 1):
+                        if level not in (0, 1, 3):
                             values_text = ' '.join(v.value.lower() + ' ' + v.key.lower() for v in status.values)
                             msg_text = status.message.lower()
                             if any(p in values_text or p in msg_text for p in _ignore_patterns):
@@ -699,15 +700,16 @@ class ui_node_class(Node):
                     ranges = self.input_msg.ranges
                     return isinstance(ranges, array.array)
                     
+                case "/odom": return isinstance(self.input_msg, Odometry)
+                case "/imu": return isinstance(self.input_msg, Imu)
+                case "/tf": return isinstance(self.input_msg, TFMessage)
+
                 case "/scan_masked":
                     if not isinstance(self.input_msg, LaserScan):
                         return False
                     ranges = self.input_msg.ranges
                     return isinstance(ranges, array.array)
-                    
-                case "/odom": return isinstance(self.input_msg, Odometry)
-                case "/imu": return isinstance(self.input_msg, Imu)
-                case "/tf": return isinstance(self.input_msg, TFMessage)      
+
                 case "/rfid": return isinstance(self.input_msg, String)
                 case "/oakd/rgb/preview/image_raw": return isinstance(self.input_msg, Image)
                 case "/dock_status":
