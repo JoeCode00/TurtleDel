@@ -8,5 +8,10 @@ log/
 **/install/
 **/log/
 
+# Python bytecode
+*.pyc
+__pycache__/
+**/__pycache__/
+
 # VS Code workspace settings
 .vscode/
