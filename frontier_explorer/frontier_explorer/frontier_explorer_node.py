@@ -112,6 +112,7 @@ class FrontierExplorer(Node):
         Returns the (x, y) position of the robot or None if the pose cannot be determined.
         """
         try:
+            # Where is robot_frame expressed in planner_frame?
             transform = self.tf_buffer.lookup_transform(
                 self.planner_frame,
                 self.robot_frame,
@@ -144,6 +145,11 @@ class FrontierExplorer(Node):
 
         def is_unknown(x, y):
             return data[idx(x, y)] == -1
+        
+        # In ROS occupancy grids, it is typically:
+        # 0 = free
+        # -1 = unknown
+        # 100 (or high value) = occupied/obstacle
 
         frontier_cells = set()
 
@@ -160,27 +166,33 @@ class FrontierExplorer(Node):
         visited = set()
         clusters = []
 
-        # Group frontier cells into clusters using breadth-first search
+        # Build connected frontier clusters using BFS (8-neighbor connectivity).
         for cell in frontier_cells:
+            # Skip cells that were already absorbed into a previous cluster.
             if cell in visited:
                 continue
 
+            # Start a new cluster from this seed cell.
             cluster = []
             q = deque([cell])
             visited.add(cell)
 
             while q:
+                # Pop next frontier cell to expand from.
                 cx, cy = q.popleft()
                 cluster.append((cx, cy))
 
+                # Explore all touching frontier neighbors (cardinal + diagonal).
                 for nx, ny in [
                     (cx+1, cy), (cx-1, cy), (cx, cy+1), (cx, cy-1),
                     (cx+1, cy+1), (cx-1, cy-1), (cx+1, cy-1), (cx-1, cy+1)
                 ]:
+                    # Queue each unseen frontier neighbor exactly once.
                     if (nx, ny) in frontier_cells and (nx, ny) not in visited:
                         visited.add((nx, ny))
                         q.append((nx, ny))
 
+            # Discard tiny frontier blobs that are likely noise.
             if len(cluster) >= self.min_frontier_size:
                 clusters.append(cluster)
 
