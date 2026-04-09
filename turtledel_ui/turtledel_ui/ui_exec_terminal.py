@@ -16,7 +16,7 @@ import rclpy
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rclpy.node import Node
 from std_msgs.msg import String
-from sensor_msgs.msg import BatteryState, LaserScan, Image
+from sensor_msgs.msg import BatteryState, LaserScan, Image, Imu
 from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
 from tf2_msgs.msg import TFMessage
 from diagnostic_msgs.msg import DiagnosticArray
@@ -156,7 +156,7 @@ class ui_node_class(Node):
 
         self.status_prefixes = ["/battery_state", "/diagnostics_agg", 
                         #    "/hazard_detection", 
-                            "/scan", "/scan_masked", "/odom", "/tf","/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+                            "/scan", "/scan_masked", "/odom", "/imu", "/tf","/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
@@ -386,6 +386,11 @@ class ui_node_class(Node):
             topic="/odom",
             )
         
+        self.imu = self.topic_monitor(self,
+            msg_type=Imu,
+            topic="/imu",
+            )
+
         self.tf = self.topic_monitor(self,
             msg_type=TFMessage,
             topic="/tf",
@@ -567,6 +572,7 @@ class ui_node_class(Node):
             self.scan,
             self.scan_masked,
             self.odom,
+            self.imu,
             self.tf,
             self.rfid,
             self.oakd,
@@ -669,7 +675,7 @@ class ui_node_class(Node):
                     statuses = self.input_msg.status
                     if not statuses:
                         return False
-                    _ignore_patterns = ('joystick', 'frequency too low', 'frequency too high', 'no events recorded')
+                    _ignore_patterns = ('joystick', 'frequency too low', 'frequency too high', 'no events recorded', 'stale', 'battery')
                     for status in statuses:
                         level = status.level if isinstance(status.level, int) else ord(status.level)
                         if level not in (0, 1):
@@ -701,6 +707,7 @@ class ui_node_class(Node):
                     return isinstance(ranges, array.array)
                     
                 case "/odom": return isinstance(self.input_msg, Odometry)
+                case "/imu": return isinstance(self.input_msg, Imu)
                 case "/tf": return isinstance(self.input_msg, TFMessage)      
                 case "/rfid": return isinstance(self.input_msg, String)
                 case "/oakd/rgb/preview/image_raw": return isinstance(self.input_msg, Image)
