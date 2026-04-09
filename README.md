@@ -287,6 +287,34 @@ Visualize /map via rviz
 ros2 launch turtlebot4_viz view_robot.launch.py
 ```
 
+## Autonomous Mapping
+
+Working on this right now 
+
+## Navigation
+Relevant sections of https://turtlebot.github.io/turtlebot4-user-manual/tutorials/navigation.html
+
+Use localization to navigate using an **existing** map
+
+Open a terminal and launch localization:
+```bash
+ros2 launch turtlebot4_navigation localization.launch.py map:=/path/to/map.yaml
+```
+replace `path/to/map.yaml` with the path to the map
+
+In another terminal launch nav2:
+```bash
+ros2 launch turtlebot4_navigation nav2.launch.py
+```
+
+Launch RViz if you haven't yet:
+```bash
+ros2 launch turtlebot4_viz view_robot.launch.py
+```
+
+[How to use Nav2 in RViz](https://turtlebot.github.io/turtlebot4-user-manual/tutorials/navigation.html#interacting-with-nav2)
+
+
 ## RFID
 To start reading rfid tags, run the rfid launcher
 ```bash
