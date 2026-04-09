@@ -154,9 +154,7 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        self.status_prefixes = ["/battery_state", "/diagnostics_agg", 
-                        #    "/hazard_detection", 
-                            "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
