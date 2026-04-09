@@ -321,12 +321,11 @@ class ui_node_class(Node):
                             
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")
-                            dpg.add_listbox(tag="topic_selector",
-                                            items=status_prefixes,
-                                            num_items=len(status_prefixes),
-                                            default_value=status_prefixes[0],
-                                            callback=self._topic_select_callback,
-                                            width=-1)
+                            dpg.add_combo(tag="topic_selector",
+                                items=status_prefixes,
+                                default_value=status_prefixes[0],
+                                callback=self._topic_select_callback,
+                                width=-1)
                             for terminal_prefix in status_prefixes:
                                 visible = (terminal_prefix == status_prefixes[0])
                                 with dpg.group(tag=f"{terminal_prefix}_topic_group", show=visible):
