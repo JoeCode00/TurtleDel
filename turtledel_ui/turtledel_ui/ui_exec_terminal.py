@@ -154,10 +154,12 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        status_prefixes = ["/battery_state", "/diagnostics_agg", 
+        self.status_prefixes = ["/battery_state", "/diagnostics_agg", 
                         #    "/hazard_detection", 
-                            "/scan", "/scan_masked", "/odom", "/tf","/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/amcl_pose"]
-        terminal_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid'] + status_prefixes
+                            "/scan", "/scan_masked", "/odom", "/tf","/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        status_prefixes = self.status_prefixes
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
             prefix: TerminalProcess(f"{prefix}_output_terminal", self.output_queue)
@@ -248,11 +250,15 @@ class ui_node_class(Node):
                                 with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                     self.status_indicator(status_prefix, self)
                             
+                            dpg.add_text("()",
+                                         tag="battery_percent_text",
+                                         before="/battery_state_text")
+                            
                             dpg.add_button(tag="scan_mask_node_start",
                                         label="Start Masking",
                                         before="/scan_masked_canvas",
                                         callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
-                            
+
                             dpg.add_button(tag="restart_rfid",
                                         label="Start RFID",
                                         before="/rfid_canvas",
@@ -291,33 +297,42 @@ class ui_node_class(Node):
                             dpg.add_button(tag="rviz_start",
                                         label="RViz",
                                         before="/map_canvas",
-                                        callback=self.command("rviz", "rviz2 -d ~/TurtleDel/robot.rviz"))
+                                        callback=self.command("rviz", "rviz2 -d ~/TurtleDel/config/robot.rviz"))
                             
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
                                         before="/map_canvas",
-                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py"))
+                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml"))
                             
                             dpg.add_button(tag="save_map",
                                         label="Save Map",
                                         before="/map_canvas",
-                                        callback=self.command("slam", "ros2 run nav2_map_server map_saver_cli -f ~/map"))
+                                        callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/map"))
 
                             dpg.add_button(tag="localize_start",
                                         label="Localize",
-                                        before="/amcl_pose_canvas",
-                                        callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/map.yaml"))
+                                        before="/costmap_canvas",
+                                        callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/map.yaml params:=$HOME/TurtleDel/config/localization.yaml"))
 
                             dpg.add_button(tag="nav_start",
                                         label="Nav",
-                                        before="/amcl_pose_canvas",
+                                        before="/costmap_canvas",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py"))
                             
-
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
-                            dpg.add_text("System Startup:")
-                            dpg.add_button(label="Save", width=-1)
-                            
+                            dpg.add_text("System Topics:")
+                            dpg.add_listbox(tag="topic_selector",
+                                            items=status_prefixes,
+                                            num_items=len(status_prefixes),
+                                            default_value=status_prefixes[0],
+                                            callback=self._topic_select_callback,
+                                            width=-1)
+                            for terminal_prefix in status_prefixes:
+                                visible = (terminal_prefix == status_prefixes[0])
+                                with dpg.group(tag=f"{terminal_prefix}_topic_group", show=visible):
+                                    with dpg.child_window(tag=f"{terminal_prefix}_output_terminal",
+                                                          width=-1, height=-1, border=True):
+                                        dpg.add_selectable(label=">", span_columns=True)
 
                 dpg.add_spacer(height=col_gap//4)
                 with dpg.child_window(tag="bottom_window",
@@ -325,7 +340,7 @@ class ui_node_class(Node):
                                       height=-1,
                                       border=True):
                     with dpg.tab_bar(tag="tab_bar", label="Tab Bar"):
-                        for terminal_prefix in terminal_prefixes:
+                        for terminal_prefix in compute_prefixes:
                             self.terminal_tab_class(terminal_prefix, self)
                         self.command("ssh_blocking", "ssh ubuntu@192.168.1.3")() #initialize ssh
                         self.command("ssh_rfid", "ssh ubuntu@192.168.1.3")() #initialize ssh
@@ -379,6 +394,7 @@ class ui_node_class(Node):
         self.rfid = self.topic_monitor(self,
             msg_type=String,
             topic="/rfid",
+            max_interval_s = 60,
             )
 
         self.oakd = self.topic_monitor(self,
@@ -402,10 +418,12 @@ class ui_node_class(Node):
             topic="/map",
             )
         
-        self.amcl_pose = self.topic_monitor(self,
-            msg_type=PoseWithCovarianceStamped,
-            topic="/amcl_pose",
+        self.costmap = self.topic_monitor(self,
+            msg_type=OccupancyGrid,
+            topic="/local_costmap/costmap",
+            tag="/costmap",
             )
+        
 
         self.create_timer(0.05, self.timer_callback)
 
@@ -425,7 +443,7 @@ class ui_node_class(Node):
                                     fill=RED, 
                                     label=f"{staus_prefix}"
                                     )
-                dpg.add_text(f"{staus_prefix}")
+                dpg.add_text(f"{staus_prefix}", tag=f"{staus_prefix}_text")
 
     def command(self, terminal_prefix: str, command: str):
         def _callback(sender=None, app_data=None):
@@ -447,6 +465,10 @@ class ui_node_class(Node):
             self._pending_network_restart = True
             self.command(terminal_prefix, command)(sender, app_data)
         return _callback
+
+    def _topic_select_callback(self, sender, app_data):
+        for prefix in self.status_prefixes:
+            dpg.configure_item(f"{prefix}_topic_group", show=(prefix == app_data))
 
     class terminal_tab_class():
         def __init__(self, terminal_prefix, node):
@@ -551,7 +573,7 @@ class ui_node_class(Node):
             self.dock_status,
             self.cmd_vel,
             self.map,
-            self.amcl_pose,
+            self.costmap,
             ]
         
         current_time = datetime.now(tz=timezone.utc)
@@ -608,7 +630,9 @@ class ui_node_class(Node):
                 self.is_good = False
 
             active_tab = dpg.get_value("tab_bar")
-            if active_tab is None or dpg.get_item_alias(active_tab) != self.tab_tag:
+            tab_alias = None if active_tab is None else dpg.get_item_alias(active_tab)
+            selected_topic = dpg.get_value("topic_selector")
+            if self.tab_tag != tab_alias and self.tag != selected_topic:
                 return
 
             now = datetime.now(tz=timezone.utc)
@@ -635,8 +659,10 @@ class ui_node_class(Node):
                 case '/battery_state':
                     if not isinstance(self.input_msg, BatteryState):
                         return False
-                    percentage = self.input_msg.percentage
-                    return percentage > 0.2
+                    percentage = self.input_msg.percentage*100
+                    
+                    dpg.set_value("battery_percent_text", f"({round(percentage)}%)")
+                    return percentage > 20
                 case '/diagnostics_agg':
                     if not isinstance(self.input_msg, DiagnosticArray):
                         return False
@@ -684,7 +710,7 @@ class ui_node_class(Node):
                     return not self.input_msg.is_docked
                 case '/cmd_vel': return isinstance(self.input_msg, Twist)
                 case '/map': return isinstance(self.input_msg, OccupancyGrid)
-                case '/amcl_pose': return isinstance(self.input_msg, PoseWithCovarianceStamped)
+                case '/local_costmap/costmap': return isinstance(self.input_msg, OccupancyGrid)
                 
 
         def seconds_between(self, older: datetime, newer: datetime) -> float:
