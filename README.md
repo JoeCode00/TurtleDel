@@ -289,7 +289,10 @@ ros2 launch turtlebot4_viz view_robot.launch.py
 
 ## Autonomous Mapping
 
-Working on this right now 
+Run this in its own terminal after SLAM and Nav2 are already running
+```bash
+ros2 run frontier_explorer frontier_explorer_node
+```
 
 ## Navigation
 Relevant sections of https://turtlebot.github.io/turtlebot4-user-manual/tutorials/navigation.html
