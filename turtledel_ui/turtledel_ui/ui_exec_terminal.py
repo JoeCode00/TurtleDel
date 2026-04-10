@@ -237,6 +237,9 @@ class ui_node_class(Node):
                                            callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "eduroam"'))
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_button(tag="create3_restart",
+                                        label="Create3 Restart",
+                                        callback=self.command("pc_blocking", 'curl -s -X POST http://192.168.1.3:8080/api/restart-app'))
                                 dpg.add_button(tag="turtlebot_restart",
                                         label="Turtlebot Restart",
                                         callback=self.command("ssh_blocking", 'sudo systemctl restart turtlebot4.service'))
@@ -306,6 +309,7 @@ class ui_node_class(Node):
                                         label="Save Map",
                                         before="/map_canvas",
                                         callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/TurtleDel/map"))
+                            
 
                             dpg.add_button(tag="localize_start",
                                         label="Localize",
@@ -527,7 +531,7 @@ class ui_node_class(Node):
 
     def ping_check(self):
         addresses = [["WIFI", "1"],
-                     ["Create3", "2"],
+                     ["Create3", "4"],
                      ["RaspberryPi", "3"]]
         for set in addresses:
             connection_prefix = set[0]
