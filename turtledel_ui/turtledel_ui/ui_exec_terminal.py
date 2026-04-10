@@ -156,7 +156,7 @@ class ui_node_class(Node):
 
         self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
-        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
@@ -300,23 +300,32 @@ class ui_node_class(Node):
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
                                         before="/map_canvas",
-                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml"))
+                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=true"))
                             
                             dpg.add_button(tag="save_map",
                                         label="Save Map",
                                         before="/map_canvas",
-                                        callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/map"))
+                                        callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/TurtleDel/map"))
 
                             dpg.add_button(tag="localize_start",
                                         label="Localize",
                                         before="/costmap_canvas",
-                                        callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/map.yaml params:=$HOME/TurtleDel/config/localization.yaml"))
+                                        callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/TurtleDel/map.yaml params:=$HOME/TurtleDel/config/localization.yaml"))
 
                             dpg.add_button(tag="nav_start",
                                         label="Nav",
                                         before="/costmap_canvas",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py"))
                             
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_button(tag="bag_record",
+                                        label="Record Bag",
+                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --exclude "/map|/oakd/rgb/preview/image_raw" --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
+                                
+                                dpg.add_button(tag="bag_play",
+                                        label="Play Bag",
+                                        callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
+
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")
                             dpg.add_combo(tag="topic_selector",

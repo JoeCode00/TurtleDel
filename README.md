@@ -389,3 +389,7 @@ The read tag IDs should be published to /rfid
 ```bash
 ros2 topic echo /rfid
 ```
+
+
+## ROS Bags
+A ROS bag file for TurtleBot SLAM requires at minimum /scan (LIDAR) and /tf (transforms) topics, though recording /odom and /joint_states is strongly recommended for better results. Use rosbag record /scan /tf /odom /joint_states to create the bag, and rosbag play --clock <bag_file> to run it. 
