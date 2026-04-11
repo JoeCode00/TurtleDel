@@ -96,6 +96,9 @@ class scan_mask_node_class(Node): # change node class name to <node_class>
             elif r < self.mask_min_range_m:
                 ranges[index] = 0.0
                 intensities[index] = 0.0
+            # Too-far readings: treat as no-return so SLAM raytraces free space
+            elif r > self.mask_max_range_m:
+                ranges[index] = float(input_msg.range_max)
             # Valid readings: pass through unchanged
 
         output_msg.ranges = ranges

@@ -13,7 +13,7 @@ slam_toolbox:
     odom_frame: odom
     map_frame: map
     base_frame: base_link
-    scan_topic: scan
+    scan_topic: scan_masked
     mode: mapping
 
     debug_logging: false
@@ -21,7 +21,7 @@ slam_toolbox:
     transform_publish_period: 0.02 #if 0 never publishes odometry
     map_update_interval: 0.5
     resolution: 0.05
-    max_laser_range: 2.0 #only mark obstacles within 2m; rays beyond clear free space
+    max_laser_range: 5.0 #only mark obstacles within 2m; rays beyond clear free space
     minimum_time_interval: 0.25
     transform_timeout: 0.2
     tf_buffer_duration: 30.
