@@ -15,7 +15,3 @@ __pycache__/
 
 # VS Code workspace settings
 .vscode/
-
-# ROS bag recordings (large files)
-turtledel_bag/
-*.db3
