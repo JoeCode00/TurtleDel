@@ -84,21 +84,27 @@ class scan_mask_node_class(Node): # change node class name to <node_class>
         intensities = list(input_msg.intensities)
 
         for index, (angle, r, intensity) in enumerate(zip(angles, ranges, intensities)):
-            condition = (   (angle > self.mask_angle_min_rad and angle < self.mask_angle_max_rad)
-                         or r < self.mask_min_range_m
-                         or r > self.mask_max_range_m
-                         or (math.isinf(r) and self.range_inf_to_range_0)
-                         or (intensity == 0 and self.intensity_0_to_range_0))
-            
-            if condition:
+            # Hard mask: robot body blocks these angles, or reading is noise
+            if self.mask_angle_min_rad < angle < self.mask_angle_max_rad:
                 ranges[index] = 0.0
                 intensities[index] = 0.0
-            
+            # No-return readings (0 or inf): replace with range_max so SLAM
+            # raytraces free space instead of ignoring the ray entirely
+            elif r == 0.0 or math.isinf(r) or math.isnan(r):
+                ranges[index] = float(input_msg.range_max)
+            # Too-close noise
+            elif r < self.mask_min_range_m:
+                ranges[index] = 0.0
+                intensities[index] = 0.0
+            # Too-far readings: treat as no-return so SLAM raytraces free space
+            elif r > self.mask_max_range_m:
+                ranges[index] = float(input_msg.range_max)
+            # Valid readings: pass through unchanged
 
         output_msg.ranges = ranges
 
         output_msg.range_min = float(self.mask_min_range_m)
-        output_msg.range_max = float(self.mask_max_range_m)
+        output_msg.range_max = float(input_msg.range_max)
 
         output_msg.intensities = intensities
     

@@ -1,0 +1,174 @@
+/battery_state:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/cliff_intensity:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/cmd_audio:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/cmd_lightring:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/cmd_vel:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/diagnostics:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/diagnostics_agg:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/diagnostics_toplevel_state:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/dock_status:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/function_calls:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/hazard_detection:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/hmi/buttons:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/hmi/display:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/hmi/display/message:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/hmi/led:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/imu:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/interface_buttons:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/ip:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/ir_intensity:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/ir_opcode:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/joint_states:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/joy:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/joy/set_feedback:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/kidnap_status:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/local_costmap/costmap:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/mobility_monitor/transition_event:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/mouse:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/oakd/rgb/preview/camera_info:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/odom:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/parameter_events:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/rfid:
+  reliability: best_effort
+  history: keep_last
+  depth: 1000
+/robot_state/transition_event:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/rosout:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/scan:
+  reliability: best_effort
+  history: keep_last
+  depth: 1000
+/scan_masked:
+  reliability: best_effort
+  history: keep_last
+  depth: 1000
+/slip_status:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/stop_status:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/tf:
+  reliability: best_effort
+  history: keep_last
+  depth: 1000
+/wheel_status:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/wheel_ticks:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/wheel_vels:
+  reliability: best_effort
+  history: keep_last
+  depth: 100
+/tf_static:
+  reliability: reliable
+  history: keep_last
+  depth: 100
+  durability: transient_local
+/robot_description:
+  reliability: reliable
+  history: keep_last
+  depth: 1
+  durability: transient_local

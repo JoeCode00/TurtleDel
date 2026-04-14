@@ -26,8 +26,8 @@ class FrontierExplorer(Node):
 
         # Declare and retrieve parameters for the node
         self.declare_parameter('map_topic', '/map')
-        self.declare_parameter('goal_timeout_sec', 90.0)
-        self.declare_parameter('min_frontier_size', 5)
+        self.declare_parameter('goal_timeout_sec', 40.0)
+        self.declare_parameter('min_frontier_size', 15)
         self.declare_parameter('planner_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
 

@@ -7,19 +7,20 @@ import sys
 import pty
 import select
 import signal
-import shlex
 import queue
 import threading
 import subprocess
 from datetime import datetime, timezone
 
 import rclpy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rclpy.node import Node
 from std_msgs.msg import String
-from sensor_msgs.msg import BatteryState, LaserScan, Image
-from geometry_msgs.msg import Twist
+from sensor_msgs.msg import BatteryState, LaserScan, Image, Imu
+from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
+from tf2_msgs.msg import TFMessage
 from diagnostic_msgs.msg import DiagnosticArray
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, OccupancyGrid
 from irobot_create_msgs.msg import HazardDetectionVector, DockStatus
 
 try:
@@ -32,7 +33,12 @@ node_name = 'ui_node'
 relative_input_topic = 'input'
 relative_output_topic = 'output'
 
-qos = 10
+qos = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    durability=DurabilityPolicy.VOLATILE
+)
 
 GREEN = (0, 255, 0, 255)
 YELLOW = (255, 255, 0, 255)
@@ -65,28 +71,19 @@ class TerminalProcess:
         if self.is_running():
             self.interrupt()
 
-        try:
-            args = shlex.split(command)
-        except ValueError as e:
-            self.output_queue.put((self.terminal_tag, f"[parse error: {e}]"))
-            return
-
         master_fd, slave_fd = pty.openpty()
         self._master_fd = master_fd
         try:
             self.process = subprocess.Popen(
-                args,
+                command,
+                shell=True,
+                executable='/bin/bash',
                 stdout=slave_fd,
                 stderr=slave_fd,
                 stdin=slave_fd,
                 close_fds=True,
                 start_new_session=True,
             )
-        except FileNotFoundError:
-            self.output_queue.put((self.terminal_tag, f"[command not found: {args[0]}]"))
-            os.close(master_fd)
-            os.close(slave_fd)
-            return
         except OSError as e:
             self.output_queue.put((self.terminal_tag, f"[error: {e}]"))
             os.close(master_fd)
@@ -157,21 +154,26 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
+        self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        status_prefixes = self.status_prefixes
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
             prefix: TerminalProcess(f"{prefix}_output_terminal", self.output_queue)
-            for prefix in ['ssh', 'diag', 'startup', 'docking', 'scan_mask', 'rqt', 'view', 'rviz', 'slam', 'nav']
+            for prefix in terminal_prefixes
         }
+        self._pending_network_restart = False
 
         dpg.create_context()
         self.viewport_width = int(1920/2)
-        self.viewport_height = int(1080)
+        self.viewport_height = 1000
         self.padding = 10
         dpg.create_viewport(title='TurtleDel',
                             width=self.viewport_width,
                             height=self.viewport_height,
-                            x_pos=2560,
-                            y_pos=0,
+                            x_pos=0,
+                            y_pos=30,
                             decorated=False,
                             )
 
@@ -184,7 +186,6 @@ class ui_node_class(Node):
 
         col_width = int((top_width - col_gap) / 2)
 
-        terminal_prefixes = ['ssh', 'diag', 'startup', 'docking', 'scan_mask', 'rqt', 'view', 'rviz', 'slam', 'nav']
 
         with dpg.window(tag="window",
                         label="",
@@ -213,38 +214,153 @@ class ui_node_class(Node):
                                                callback=self.exit_callback,
                                                )
                                 dpg.add_button(tag="RESTART",
-                                               label="RESTART",
+                                               label="RESTART UI",
                                                callback=self.restart_callback,
                                                )
                                 dpg.add_text("TurtleDel: Group 2 User Interface")
                             dpg.add_text("System State:")
                             
-                            status_rows = [["WIFI", "RaspberryPi", "Create3"],
-                                           ["/battery_state", "/diagnostics_agg", "/hazard_detection"],
-                                           ["/dock_status", "/scan", "/scan_masked", "/odom", "/rfid"],
-                                           ["/oakd", "/cmd_vel"],
-                                           ]
-                            for row in status_rows:
+                            connection_rows = [["WIFI", "RaspberryPi", "Create3"]]
+                            for row in connection_rows:
                                 with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                     for status_prefix in row:
                                         self.status_indicator(status_prefix, self)
 
-                        with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
-                            dpg.add_text("System Startup:")
-                            dpg.add_button(label="Save", width=-1)
+                            dpg.add_button(tag="wifi_connect",
+                                           label="Connect",
+                                           before="WIFI_canvas",
+                                           callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "turtlebot-hub-5G"'))
                             
+                            dpg.add_button(tag="wifi_disconnect",
+                                           label="Disconnect",
+                                           before="WIFI_canvas",
+                                           callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "eduroam"'))
+
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_button(tag="create3_restart",
+                                        label="Create3 Restart",
+                                        callback=self.command("pc_blocking", 'curl -s -X POST http://192.168.1.3:8080/api/restart-app'))
+                                dpg.add_button(tag="turtlebot_restart",
+                                        label="Turtlebot Restart",
+                                        callback=self.command("ssh_blocking", 'sudo systemctl restart turtlebot4.service'))
+                                dpg.add_button(tag="rpi_restart",
+                                        label="Rasberry Pi Restart",
+                                        callback=self.command("ssh_blocking", 'sudo reboot'))
+
+                            for status_prefix in status_prefixes:
+                                with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                    self.status_indicator(status_prefix, self)
+                            
+                            dpg.add_text("()",
+                                         tag="battery_percent_text",
+                                         before="/battery_state_text")
+                            
+                            dpg.add_button(tag="scan_mask_node_start",
+                                        label="Start Masking",
+                                        before="/scan_masked_canvas",
+                                        callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
+
+                            dpg.add_button(tag="restart_rfid",
+                                        label="Start RFID",
+                                        before="/rfid_canvas",
+                                        callback=self.command("ssh_rfid", "source /opt/ros/humble/setup.bash && cd ~/TurtleDel && source install/setup.bash && ros2 launch rfid rfid.launch.py"))
+
+                            dpg.add_button(tag="restart_oakd",
+                                        label="Restart Camera",
+                                        before="/oakd_canvas",
+                                        callback=self.command("ssh_blocking", "source /opt/ros/humble/setup.bash && ros2 service call /oakd/start_camera std_srvs/srv/Trigger \{\}"))
+                            
+                            dpg.add_button(tag="show_oakd",
+                                        label="Show Camera",
+                                        before="/oakd_canvas",
+                                        callback=self.command("rqt", "ros2 run rqt_image_view rqt_image_view /oakd/rgb/preview/image_raw"))
+
+                            dpg.add_button(tag="undock",
+                                        label="Undock",
+                                        before="/dock_status_canvas",
+                                        callback=self.command("pc_blocking", "ros2 action send_goal /undock irobot_create_msgs/action/Undock \{\}"))
+
+                            dpg.add_button(tag="dock",
+                                        label="Dock",
+                                        before="/dock_status_canvas",
+                                        callback=self.command("pc_blocking", "ros2 action send_goal /dock irobot_create_msgs/action/Dock \{\}"))
+
+                            dpg.add_button(tag="autonomy_start",
+                                        label="Autonomy",
+                                        before="/cmd_vel_canvas",
+                                        callback=self.command("", ""))
+                            
+                            dpg.add_button(tag="teleop_start",
+                                        label="TeleOp",
+                                        before="/cmd_vel_canvas",
+                                        callback=self.command("external", "ros2 run teleop_twist_keyboard teleop_twist_keyboard"))
+
+                            dpg.add_button(tag="rviz_start",
+                                        label="RViz",
+                                        before="/map_canvas",
+                                        callback=self.command("rviz", "rviz2 -d ~/TurtleDel/config/robot.rviz"))
+                            
+                            dpg.add_button(tag="slam_start",
+                                        label="SLAM",
+                                        before="/map_canvas",
+                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=true"))
+                            
+                            dpg.add_button(tag="save_map",
+                                        label="Save Map",
+                                        before="/map_canvas",
+                                        callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/TurtleDel/map"))
+                            
+
+                            dpg.add_button(tag="localize_start",
+                                        label="Localize",
+                                        before="/costmap_canvas",
+                                        callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/TurtleDel/map.yaml params:=$HOME/TurtleDel/config/localization.yaml"))
+
+                            dpg.add_button(tag="nav_start",
+                                        label="Nav",
+                                        before="/costmap_canvas",
+                                        callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py"))
+
+                            dpg.add_button(tag="explore_start",
+                                        label="Explore",
+                                        before="/costmap_canvas",
+                                        callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
+                            
+                            
+                            
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_button(tag="bag_record",
+                                        label="Record Bag",
+                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --exclude "/map|/oakd/rgb/preview/image_raw" --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
+                                
+                                dpg.add_button(tag="bag_play",
+                                        label="Play Bag",
+                                        callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
+
+                        with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
+                            dpg.add_text("System Topics:")
+                            dpg.add_combo(tag="topic_selector",
+                                items=status_prefixes,
+                                default_value=status_prefixes[0],
+                                callback=self._topic_select_callback,
+                                width=-1)
+                            for terminal_prefix in status_prefixes:
+                                visible = (terminal_prefix == status_prefixes[0])
+                                with dpg.group(tag=f"{terminal_prefix}_topic_group", show=visible):
+                                    with dpg.child_window(tag=f"{terminal_prefix}_output_terminal",
+                                                          width=-1, height=-1, border=True):
+                                        dpg.add_selectable(label=">", span_columns=True)
 
                 dpg.add_spacer(height=col_gap//4)
                 with dpg.child_window(tag="bottom_window",
                                       width=-1,
                                       height=-1,
                                       border=True):
-                    with dpg.tab_bar(label="Tab Bar"):
-                        
-                        
-                        for terminal_prefix in terminal_prefixes:
+                    with dpg.tab_bar(tag="tab_bar", label="Tab Bar"):
+                        for terminal_prefix in compute_prefixes:
                             self.terminal_tab_class(terminal_prefix, self)
-                        
+                        self.command("ssh_blocking", "ssh ubuntu@192.168.1.3")() #initialize ssh
+                        self.command("ssh_rfid", "ssh ubuntu@192.168.1.3")() #initialize ssh
 
         with dpg.theme() as terminal_theme:
             with dpg.theme_component(dpg.mvAll):
@@ -267,24 +383,14 @@ class ui_node_class(Node):
             topic="/diagnostics_agg",
             )
 
-        self.hazard_detection = self.topic_monitor(self,
-            msg_type=HazardDetectionVector,
-            topic="/hazard_detection",
-            )
-        
-        self.dock_status = self.topic_monitor(self,
-            msg_type=DockStatus,
-            topic="/dock_status",
-            )
+        # self.hazard_detection = self.topic_monitor(self,
+        #     msg_type=HazardDetectionVector,
+        #     topic="/hazard_detection",
+        #     )
         
         self.scan = self.topic_monitor(self,
             msg_type=LaserScan,
             topic="/scan",
-            )
-        
-        self.scan_masked = self.topic_monitor(self,
-            msg_type=LaserScan,
-            topic="/scan_masked",
             )
         
         self.odom = self.topic_monitor(self,
@@ -292,21 +398,54 @@ class ui_node_class(Node):
             topic="/odom",
             )
         
+        self.imu = self.topic_monitor(self,
+            msg_type=Imu,
+            topic="/imu",
+            )
+
+        self.tf = self.topic_monitor(self,
+            msg_type=TFMessage,
+            topic="/tf",
+            )
+        
+        self.scan_masked = self.topic_monitor(self,
+            msg_type=LaserScan,
+            topic="/scan_masked",
+            )
+        
         self.rfid = self.topic_monitor(self,
             msg_type=String,
             topic="/rfid",
+            max_interval_s = 60,
             )
 
         self.oakd = self.topic_monitor(self,
             msg_type=Image,
             topic="/oakd/rgb/preview/image_raw",
-            tag="/oakd"
+            tag="/oakd",
+            )
+        
+        self.dock_status = self.topic_monitor(self,
+            msg_type=DockStatus,
+            topic="/dock_status",
             )
         
         self.cmd_vel = self.topic_monitor(self,
             msg_type=Twist,
             topic="/cmd_vel",
             )
+        
+        self.map = self.topic_monitor(self,
+            msg_type=OccupancyGrid,
+            topic="/map",
+            )
+        
+        self.costmap = self.topic_monitor(self,
+            msg_type=OccupancyGrid,
+            topic="/local_costmap/costmap",
+            tag="/costmap",
+            )
+        
 
         self.create_timer(0.05, self.timer_callback)
 
@@ -318,7 +457,7 @@ class ui_node_class(Node):
         def __init__(self, staus_prefix, node):
             radius=6
             with dpg.group(horizontal=True, horizontal_spacing=node.padding):
-                with dpg.drawlist(width=int(2*radius), height=int(2.6*radius)):
+                with dpg.drawlist(tag=f"{staus_prefix}_canvas",width=int(2*radius), height=int(2.6*radius)):
                     dpg.draw_circle(tag=f"{staus_prefix}_status",
                                     center=(radius, 1.6*radius), 
                                     radius=radius, 
@@ -326,11 +465,36 @@ class ui_node_class(Node):
                                     fill=RED, 
                                     label=f"{staus_prefix}"
                                     )
-                dpg.add_text(f"{staus_prefix}")
+                dpg.add_text(f"{staus_prefix}", tag=f"{staus_prefix}_text")
+
+    def command(self, terminal_prefix: str, command: str):
+        def _callback(sender=None, app_data=None):
+            if terminal_prefix == "external":
+                subprocess.Popen(
+                    ['gnome-terminal', '--', 'bash', '-c', command + '; exec bash'],
+                    start_new_session=True,
+                )
+            else:
+                dpg.set_value("tab_bar", f"{terminal_prefix}_tab") #focuses this terminal
+                input_tag = f"{terminal_prefix}_input_field"
+                dpg.set_value(input_tag, command)
+                self.submit_callback(input_tag, app_data)
+        return _callback
+
+    def _network_change_command(self, terminal_prefix: str, command: str):
+        """Like command(), but auto-restarts the node after completion for DDS re-discovery."""
+        def _callback(sender=None, app_data=None):
+            self._pending_network_restart = True
+            self.command(terminal_prefix, command)(sender, app_data)
+        return _callback
+
+    def _topic_select_callback(self, sender, app_data):
+        for prefix in self.status_prefixes:
+            dpg.configure_item(f"{prefix}_topic_group", show=(prefix == app_data))
 
     class terminal_tab_class():
         def __init__(self, terminal_prefix, node):
-            with dpg.tab(label=terminal_prefix):
+            with dpg.tab(tag=f"{terminal_prefix}_tab", label=terminal_prefix):
                 with dpg.child_window(width=-1, height=-1, border=True, tag=""):
                     with dpg.child_window(tag=f"{terminal_prefix}_output_terminal", 
                                           width=-1, 
@@ -374,7 +538,7 @@ class ui_node_class(Node):
 
     def ping_check(self):
         addresses = [["WIFI", "1"],
-                     ["Create3", "2"],
+                     ["Create3", "4"],
                      ["RaspberryPi", "3"]]
         for set in addresses:
             connection_prefix = set[0]
@@ -419,14 +583,20 @@ class ui_node_class(Node):
     def monitor_health_callback(self):
         """Check if topic monitors are receiving data within their max_interval_s threshold."""
         monitors = [
-            self.hazard_detection,
-            self.dock_status,
+            self.battery_state,
+            self.diagnostics_agg,
+            # self.hazard_detection,
             self.scan,
-            self.scan_masked,
             self.odom,
+            self.imu,
+            self.tf,
+            self.scan_masked,
             self.rfid,
             self.oakd,
+            self.dock_status,
             self.cmd_vel,
+            self.map,
+            self.costmap,
             ]
         
         current_time = datetime.now(tz=timezone.utc)
@@ -446,7 +616,7 @@ class ui_node_class(Node):
             dpg.configure_item(f"{monitor.tag}_status", color=color, fill=color)
     
     class topic_monitor():
-        def __init__(self, node, msg_type, topic, tag = None, qos_profile = 10, max_interval_s = 10):
+        def __init__(self, node, msg_type, topic, tag = None, qos_profile = qos, max_interval_s = 10):
             self.subscription = node.create_subscription(
                 msg_type=msg_type,
                 topic=topic,
@@ -468,6 +638,12 @@ class ui_node_class(Node):
             self.is_alive = False
             self.is_good = False
 
+            self.output_queue = node.output_queue
+            self.terminal_tag = f"{self.tag}_output_terminal"
+            self.tab_tag = f"{self.tag}_tab"
+            self._last_print_time = None
+            self._print_interval = 1.0
+
         def subscription_callback(self, input_msg):
             self.input_msg = input_msg
             self.is_alive = self.topic_is_alive()
@@ -475,6 +651,19 @@ class ui_node_class(Node):
                 self.is_good = self.topic_is_good()
             else:
                 self.is_good = False
+
+            active_tab = dpg.get_value("tab_bar")
+            tab_alias = None if active_tab is None else dpg.get_item_alias(active_tab)
+            selected_topic = dpg.get_value("topic_selector")
+            if self.tab_tag != tab_alias and self.tag != selected_topic:
+                return
+
+            now = datetime.now(tz=timezone.utc)
+            if self._last_print_time is None or (now - self._last_print_time).total_seconds() >= self._print_interval:
+                self._last_print_time = now
+                for line in str(input_msg).split(','):
+                    self.output_queue.put((self.terminal_tag, line.strip()))
+                self.output_queue.put((self.terminal_tag, "---"))
             
         def topic_is_alive(self):
             self.current_timestamp = datetime.now(tz=timezone.utc) # could get this from header
@@ -493,7 +682,9 @@ class ui_node_class(Node):
                 case '/battery_state':
                     if not isinstance(self.input_msg, BatteryState):
                         return False
-                    percentage = self.input_msg.percentage
+                    percentage = self.input_msg.percentage*100
+                    
+                    dpg.set_value("battery_percent_text", f"({round(percentage)}%)")
                     return percentage > 20
                 case '/diagnostics_agg':
                     if not isinstance(self.input_msg, DiagnosticArray):
@@ -501,23 +692,25 @@ class ui_node_class(Node):
                     statuses = self.input_msg.status
                     if not statuses:
                         return False
+                    _ignore_patterns = ('joystick', 'frequency too low', 'frequency too high', 'no events recorded', 'stale', 'battery',
+                                        'undocked', 'docked', 'no hazards detected', 'enabled', 'hazard detection', 'wheel status', 'dock status')
                     for status in statuses:
-                        if status.level != 0:
+                        level = status.level if isinstance(status.level, int) else ord(status.level)
+                        if level not in (0, 1, 3):
+                            values_text = ' '.join(v.value.lower() + ' ' + v.key.lower() for v in status.values)
+                            msg_text = status.message.lower()
+                            if any(p in values_text or p in msg_text for p in _ignore_patterns):
+                                continue
                             return False
                     return True
                     
-                case "/hazard_detection":
-                    if not isinstance(self.input_msg, HazardDetectionVector):
-                        return False
-                    detections = self.input_msg.detections
-                    if len(detections) > 0:
-                        return False
-                    return True
-                    
-                case "/dock_status":
-                    if not isinstance(self.input_msg, DockStatus):
-                        return False
-                    return not self.input_msg.is_docked
+                # case "/hazard_detection":
+                #     if not isinstance(self.input_msg, HazardDetectionVector):
+                #         return False
+                #     detections = self.input_msg.detections
+                #     if len(detections) > 0:
+                #         return False
+                #     return True
                     
                 case "/scan":
                     if not isinstance(self.input_msg, LaserScan): 
@@ -525,19 +718,26 @@ class ui_node_class(Node):
                     ranges = self.input_msg.ranges
                     return isinstance(ranges, array.array)
                     
+                case "/odom": return isinstance(self.input_msg, Odometry)
+                case "/imu": return isinstance(self.input_msg, Imu)
+                case "/tf": return isinstance(self.input_msg, TFMessage)
+
                 case "/scan_masked":
                     if not isinstance(self.input_msg, LaserScan):
                         return False
                     ranges = self.input_msg.ranges
                     return isinstance(ranges, array.array)
-                    
-                case "/odom": return isinstance(self.input_msg, Odometry)
-                        
-                case "/rfid": return isinstance(self.input_msg, String)
 
+                case "/rfid": return isinstance(self.input_msg, String)
                 case "/oakd/rgb/preview/image_raw": return isinstance(self.input_msg, Image)
-            
+                case "/dock_status":
+                    if not isinstance(self.input_msg, DockStatus):
+                        return False
+                    return not self.input_msg.is_docked
                 case '/cmd_vel': return isinstance(self.input_msg, Twist)
+                case '/map': return isinstance(self.input_msg, OccupancyGrid)
+                case '/local_costmap/costmap': return isinstance(self.input_msg, OccupancyGrid)
+                
 
         def seconds_between(self, older: datetime, newer: datetime) -> float:
             return (newer - older).total_seconds()
@@ -550,6 +750,12 @@ class ui_node_class(Node):
         except queue.Empty:
             pass
 
+        if self._pending_network_restart and not self.terminal_procs['pc_blocking'].is_running():
+            self._pending_network_restart = False
+            self.get_logger().info('Network changed, restarting for DDS re-discovery...')
+            self._restart = True
+            dpg.stop_dearpygui()
+
         if not dpg.is_dearpygui_running():
             self.get_logger().info(f'No longer rendering, exiting UI Node.')
             raise SystemExit
@@ -557,6 +763,10 @@ class ui_node_class(Node):
 
 
 def main(args=None):
+    # Ensure ROS env vars are set even when launched outside a sourced shell
+    os.environ.setdefault('ROS_DOMAIN_ID', '0')
+    os.environ.setdefault('ROS_LOCALHOST_ONLY', '0')
+    os.environ.setdefault('RMW_IMPLEMENTATION', 'rmw_fastrtps_cpp')
     node = None
     rclpy.init(args=args)
     try:

@@ -287,6 +287,69 @@ Visualize /map via rviz
 ros2 launch turtlebot4_viz view_robot.launch.py
 ```
 
+## Saving the Map
+Once you are happy with your map, you can save it with the following command:
+```bash
+ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name:
+  {data: 'map_name'}}"
+```
+**Note:**  
+If you are using namespacing, you will need to call the map saver tool directly:
+```bash
+ros2 run nav2_map_server map_saver_cli -f ~/src/TurtleDel/map_name
+```
+or generally
+```bash
+ros2 run nav2_map_server map_saver_cli -f "map_name" --ros-args -p map_subscribe_transient_local:=true -r __ns:=/namespace
+```
+**What gets generated?**  
+The command creates two files in your current directory:
+- `"map_name".pgm`: The actual image of the map (Occupancy Grid), which can be viewed in an image editor. Black = Obstacles, White = Free Space, Gray = Unknown.
+- `"map_name".yaml`: The metadata containing the resolution (m/pixel) and origin. You can edit this file to adjust the map parameters
+
+**Troubleshooting**  
+- If the map is not saving, ensure that the ```bash /slam_toolbox/save_map ``` service is active by running ```bash ros2 service list ```
+
+- If your map is empty, check if you have sourced your ROS 2 environment ( ```bash source /opt/ros/humble/setup.bash ```).
+
+**Reusing for Navigation**  
+- To use this map again later for navigation, you will pass the path of the YAML file to the Nav2 map server, typically by adding `map:=$HOME/my_new_map.yaml` as an argument when starting your TurtleBot4's navigation launch file.
+
+## Using Your Saved Map
+**1. Close your SLAM Terminals**    
+- You cannot run the SLAM node and the Navigation/Localization nodes at the same time on the same map topic. Make sure to kill the `slam.launch.py` process first.
+
+**2. Launch Navigation with your Map**
+    
+- Open a terminal and run the navigation launch file with the `turtlebot4_navigation` package. You must pass the **absolute path** to your `.yaml` file.
+```bash
+ros2 launch turtlebot4_navigation nav_stack.launch.py map:=$HOME/your_map_name.yaml
+```
+- Note: The exact launch file name might be `nav2.launch.py` depending on your specific workspace setup, but `nav_stack` is standard for the TurtleBot4.
+
+**3. Launch the Visualization**
+    
+- On your workstation, bring up Rviz so you can see the robot on the static map:
+```bash
+ros2 launch turtlebot4_viz view_navigation.launch.py
+```
+**4. 2D Pose Estimate**  
+
+- When the map loads, the TB will likely be "lost" -> its internal coordinate system may not line up with the static map yet
+  - In Rviz2, click the **2D Pose Estimate** button at the top
+  - Click and drag on the map at the robot's **actual physical location** to tell it which way it's facing
+  - You'll see a cloud of green arrows (the particle filter) appear around the robot
+
+**5. Localize the Robot**
+      
+- Drive the robot around manually for a few seconds. This allows the sensors to match the laser scans to the walls on your saved `.pgm` image.
+- Once all the green arrows collapse into a tight cluster, the robot is localized
+
+**6. Send a Navigation Goal**
+  
+- Now you can use the Nav2 Goal button in Rviz. Click anywhere on the map, and the robot will calculate a path and drive their autonomously. 
+  
+
 ## Autonomous Mapping
 
 Run this in its own terminal after SLAM and Nav2 are already running
@@ -329,3 +392,7 @@ The read tag IDs should be published to /rfid
 ```bash
 ros2 topic echo /rfid
 ```
+
+
+## ROS Bags
+A ROS bag file for TurtleBot SLAM requires at minimum /scan (LIDAR) and /tf (transforms) topics, though recording /odom and /joint_states is strongly recommended for better results. Use rosbag record /scan /tf /odom /joint_states to create the bag, and rosbag play --clock <bag_file> to run it. 

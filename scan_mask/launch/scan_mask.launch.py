@@ -15,7 +15,7 @@ def generate_launch_description():
                 'mask_angle_mid_deg': 90,
                 'mask_angle_width_deg': 20,
                 'mask_min_range_m': 0.2,
-                'mask_max_range_m': 8.0,
+                'mask_max_range_m': 5,
                 'range_inf_to_range_0': True,
                 'intensity_0_to_range_0': True, #(5/7)
 						    #fill with dict of parameters
