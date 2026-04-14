@@ -9,6 +9,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 
 # Import message and action types for navigation and geometry
+from action_msgs.msg import GoalStatus
 from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
@@ -27,12 +28,14 @@ class FrontierExplorer(Node):
         # Declare and retrieve parameters for the node
         self.declare_parameter('map_topic', '/map')
         self.declare_parameter('goal_timeout_sec', 40.0)
+        self.declare_parameter('goal_max_reattempts', 0)
         self.declare_parameter('min_frontier_size', 15)
         self.declare_parameter('planner_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
 
         map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
         self.goal_timeout_sec = self.get_parameter('goal_timeout_sec').get_parameter_value().double_value
+        self.goal_max_reattempts = self.get_parameter('goal_max_reattempts').get_parameter_value().integer_value
         self.min_frontier_size = self.get_parameter('min_frontier_size').get_parameter_value().integer_value
         self.planner_frame = self.get_parameter('planner_frame').get_parameter_value().string_value
         self.robot_frame = self.get_parameter('robot_frame').get_parameter_value().string_value
@@ -40,8 +43,14 @@ class FrontierExplorer(Node):
         # Initialize variables for map data, goal handling, and exploration state
         self.map_msg = None
         self.current_goal_handle = None
+        self.current_goal_id = None
+        self.current_goal_xy = None
+        self.current_goal_key = None
+        self.current_goal_attempt = 0
         self.current_goal_sent_time = None
         self.exploring = False
+        self.failed_goal_blacklist = set()
+        self.goal_sequence = 0
 
         # Subscribe to the map topic to receive occupancy grid updates
         self.map_sub = self.create_subscription(
@@ -79,11 +88,13 @@ class FrontierExplorer(Node):
             self.get_logger().info('Waiting for map...')
             return
 
-        if not self.nav_to_pose_client.wait_for_server(timeout_sec=0.5):
-            self.get_logger().info('Waiting for Nav2 action server...')
+        if self.exploring:
+            if self.check_current_goal_timeout():
+                return
             return
 
-        if self.exploring:
+        if not self.nav_to_pose_client.wait_for_server(timeout_sec=0.5):
+            self.get_logger().info('Waiting for Nav2 action server...')
             return
 
         # Get the current robot pose
@@ -208,6 +219,8 @@ class FrontierExplorer(Node):
 
         for cluster in frontiers:
             wx, wy = self.cluster_centroid_to_world(cluster, self.map_msg)
+            if self.is_goal_blacklisted((wx, wy)):
+                continue
             dist = math.hypot(wx - robot_pose[0], wy - robot_pose[1])
 
             # Score is based on distance and cluster size
@@ -218,6 +231,123 @@ class FrontierExplorer(Node):
                 best_goal = (wx, wy)
 
         return best_goal
+
+    def goal_key_from_world(self, goal_xy):
+        """
+        Convert a goal in world coordinates into a stable map-cell key.
+        """
+        origin_x = self.map_msg.info.origin.position.x
+        origin_y = self.map_msg.info.origin.position.y
+        resolution = self.map_msg.info.resolution
+
+        cell_x = int(round((goal_xy[0] - origin_x) / resolution))
+        cell_y = int(round((goal_xy[1] - origin_y) / resolution))
+        return (cell_x, cell_y)
+
+    def is_goal_blacklisted(self, goal_xy):
+        """
+        Return True when the goal has already been marked as failed.
+        """
+        return self.goal_key_from_world(goal_xy) in self.failed_goal_blacklist
+
+    def _goal_status_name(self, status):
+        """
+        Convert a Nav2 action result status into a readable label.
+        """
+        status_names = {
+            GoalStatus.STATUS_UNKNOWN: 'unknown',
+            GoalStatus.STATUS_ACCEPTED: 'accepted',
+            GoalStatus.STATUS_EXECUTING: 'executing',
+            GoalStatus.STATUS_CANCELING: 'canceling',
+            GoalStatus.STATUS_SUCCEEDED: 'succeeded',
+            GoalStatus.STATUS_CANCELED: 'canceled',
+            GoalStatus.STATUS_ABORTED: 'aborted',
+        }
+        return status_names.get(status, f'status {status}')
+
+    def _reset_active_goal_state(self):
+        """
+        Clear the currently active goal bookkeeping.
+        """
+        self.current_goal_handle = None
+        self.current_goal_id = None
+        self.current_goal_xy = None
+        self.current_goal_key = None
+        self.current_goal_attempt = 0
+        self.current_goal_sent_time = None
+        self.exploring = False
+
+    def check_current_goal_timeout(self):
+        """
+        Cancel and fail the active goal if it exceeds goal_timeout_sec.
+        Returns True when the timeout was handled.
+        """
+        if not self.exploring or self.current_goal_sent_time is None:
+            return False
+
+        if self.goal_timeout_sec <= 0.0:
+            return False
+
+        elapsed = (self.get_clock().now() - self.current_goal_sent_time).nanoseconds / 1e9
+        if elapsed < self.goal_timeout_sec:
+            return False
+
+        goal_id = self.current_goal_id
+        goal_xy = self.current_goal_xy
+
+        self.get_logger().warn(
+            f'Goal timed out after {elapsed:.1f}s (limit {self.goal_timeout_sec:.1f}s).'
+        )
+
+        if self.current_goal_handle is not None:
+            try:
+                self.current_goal_handle.cancel_goal_async()
+            except Exception as e:
+                self.get_logger().warn(f'Failed to request goal cancellation: {e}')
+
+        self._handle_goal_failure(goal_id, 'timed out', goal_xy_override=goal_xy)
+        return True
+
+    def _handle_goal_failure(self, goal_id, reason, goal_xy_override=None):
+        """
+        Handle a failed or timed-out goal, retrying or blacklisting as needed.
+        """
+        if goal_id != self.current_goal_id:
+            return
+
+        goal_xy = goal_xy_override if goal_xy_override is not None else self.current_goal_xy
+        goal_key = self.current_goal_key
+        goal_attempt = self.current_goal_attempt
+
+        self._reset_active_goal_state()
+
+        if goal_xy is None or goal_key is None:
+            self.get_logger().warn(f'Goal {reason}, but no goal coordinates were available.')
+            return
+
+        reattempts_used = goal_attempt - 1
+        if reattempts_used < self.goal_max_reattempts:
+            next_attempt = goal_attempt + 1
+            self.get_logger().warn(
+                f'Goal {reason}; retrying attempt {next_attempt} of {self.goal_max_reattempts + 1}.'
+            )
+            self.send_goal(goal_xy, attempt_number=next_attempt)
+            return
+
+        self.failed_goal_blacklist.add(goal_key)
+        self.get_logger().warn(
+            f'Goal {reason}; blacklisting after {reattempts_used} reattempts.'
+        )
+
+    def _handle_goal_success(self, goal_id):
+        """
+        Clear bookkeeping after a goal succeeds.
+        """
+        if goal_id != self.current_goal_id:
+            return
+
+        self.get_logger().info('Goal finished successfully.')
+        self._reset_active_goal_state()
 
     def cluster_centroid_to_world(self, cluster, map_msg):
         """
@@ -235,10 +365,20 @@ class FrontierExplorer(Node):
         wy = origin_y + (my + 0.5) * resolution
         return wx, wy
 
-    def send_goal(self, goal_xy):
+    def send_goal(self, goal_xy, attempt_number=1):
         """
         Send a navigation goal to the Nav2 action server.
         """
+        goal_key = self.goal_key_from_world(goal_xy)
+        if goal_key in self.failed_goal_blacklist:
+            self.get_logger().warn(
+                f'Skipping blacklisted goal at x={goal_xy[0]:.2f}, y={goal_xy[1]:.2f}'
+            )
+            return
+
+        self.goal_sequence += 1
+        goal_id = self.goal_sequence
+
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
         goal_msg.pose.header.frame_id = self.planner_frame
@@ -248,14 +388,25 @@ class FrontierExplorer(Node):
         goal_msg.pose.pose.position.z = 0.0
         goal_msg.pose.pose.orientation.w = 1.0
 
+        self.current_goal_handle = None
+        self.current_goal_id = goal_id
+        self.current_goal_xy = goal_xy
+        self.current_goal_key = goal_key
+        self.current_goal_attempt = attempt_number
+        self.current_goal_sent_time = self.get_clock().now()
         self.exploring = True
-        self.get_logger().info(f'Sending goal to x={goal_xy[0]:.2f}, y={goal_xy[1]:.2f}')
+        self.get_logger().info(
+            f'Sending goal to x={goal_xy[0]:.2f}, y={goal_xy[1]:.2f} '
+            f'(attempt {attempt_number})'
+        )
 
         send_goal_future = self.nav_to_pose_client.send_goal_async(
             goal_msg,
             feedback_callback=self.feedback_callback
         )
-        send_goal_future.add_done_callback(self.goal_response_callback)
+        send_goal_future.add_done_callback(
+            lambda future, goal_id=goal_id: self.goal_response_callback(future, goal_id)
+        )
 
     def feedback_callback(self, feedback_msg):
         """
@@ -264,33 +415,52 @@ class FrontierExplorer(Node):
         """
         pass
 
-    def goal_response_callback(self, future):
+    def goal_response_callback(self, future, goal_id):
         """
         Callback for handling the response to a sent goal.
         Logs whether the goal was accepted or rejected.
         """
-        goal_handle = future.result()
+        if goal_id != self.current_goal_id:
+            return
+
+        try:
+            goal_handle = future.result()
+        except Exception as e:
+            self.get_logger().error(f'Goal request failed: {e}')
+            self._handle_goal_failure(goal_id, f'error: {e}')
+            return
+
         if not goal_handle.accepted:
             self.get_logger().warn('Goal rejected.')
-            self.exploring = False
+            self._handle_goal_failure(goal_id, 'rejected')
             return
 
         self.get_logger().info('Goal accepted.')
         self.current_goal_handle = goal_handle
         result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self.goal_result_callback)
+        result_future.add_done_callback(
+            lambda future, goal_id=goal_id: self.goal_result_callback(future, goal_id)
+        )
 
-    def goal_result_callback(self, future):
+    def goal_result_callback(self, future, goal_id):
         """
         Callback for handling the result of a completed goal.
         Logs whether the goal succeeded or failed.
         """
+        if goal_id != self.current_goal_id:
+            return
+
         try:
             result = future.result()
-            self.get_logger().info('Goal finished.')
+            if result.status == GoalStatus.STATUS_SUCCEEDED:
+                self._handle_goal_success(goal_id)
+            else:
+                status_name = self._goal_status_name(result.status)
+                self.get_logger().warn(f'Goal finished with {status_name}.')
+                self._handle_goal_failure(goal_id, status_name)
         except Exception as e:
             self.get_logger().error(f'Goal failed: {e}')
-        self.exploring = False
+            self._handle_goal_failure(goal_id, f'error: {e}')
 
 def main(args=None):
     """
