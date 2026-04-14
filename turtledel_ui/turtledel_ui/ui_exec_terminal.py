@@ -326,8 +326,6 @@ class ui_node_class(Node):
                                         before="/costmap_canvas",
                                         callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
                             
-                            
-                            
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_button(tag="bag_record",
                                         label="Record Bag",
