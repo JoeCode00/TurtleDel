@@ -156,7 +156,7 @@ class ui_node_class(Node):
 
         self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
-        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
@@ -320,6 +320,13 @@ class ui_node_class(Node):
                                         label="Nav",
                                         before="/costmap_canvas",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py"))
+
+                            dpg.add_button(tag="explore_start",
+                                        label="Explore",
+                                        before="/costmap_canvas",
+                                        callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
+                            
+                            
                             
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_button(tag="bag_record",
