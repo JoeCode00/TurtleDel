@@ -21,9 +21,9 @@ slam_toolbox:
     transform_publish_period: 0.02 #if 0 never publishes odometry
     map_update_interval: 1.0 # increasing this slightly from 0.5 to give the CPU more time
 
-    resolution: 0.02 # changing this to be sharper (was 0.5)
+    resolution: 0.02 # changing this to be sharper (was 0.05)
     # changing max_laser_range slightly just to see what it does
-    max_laser_range: 6.0 #only mark obstacles within 2m; rays beyond clear free space
+    max_laser_range: 10.0 #only mark obstacles within 2m; rays beyond clear free space
 
     # added this line to imlpement "negative trust", just to test. gotta be careful with glassy or shiny surfaces
     inf_is_valid: true 
