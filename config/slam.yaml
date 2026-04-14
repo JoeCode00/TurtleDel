@@ -35,7 +35,8 @@ slam_toolbox:
 
     # General Parameters
      # switching this to true for now, turning it on forces the robot to compare current laser sans against the existing map to correct for wheel slipping
-    use_scan_matching: true
+    # false for trusting odometry over scans
+    use_scan_matching: false
     # switching this to true for now, this tells the algorithm to use the center of mass of the laser scan poitns for matching, which is more stable than picking random points
     use_scan_barycenter: true
     # giving slight values to this so it stops the robot from constantly updating the map while its sitting or barely moving. 
@@ -49,7 +50,8 @@ slam_toolbox:
     link_scan_maximum_distance: 1.5
 
     # changing to true, allows robot to recognize loops. 
-    do_loop_closing: true
+    # false for trusting odometry over scans
+    do_loop_closing: false
     loop_match_minimum_chain_size: 10
     loop_match_maximum_variance_coarse: 3.0
     loop_match_minimum_response_coarse: 0.35
