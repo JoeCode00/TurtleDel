@@ -19,30 +19,43 @@ slam_toolbox:
     debug_logging: false
     throttle_scans: 1
     transform_publish_period: 0.02 #if 0 never publishes odometry
-    map_update_interval: 0.5
-    resolution: 0.05
-    max_laser_range: 10.0
-    minimum_time_interval: 0.25
+    map_update_interval: 1.0 # increasing this slightly from 0.5 to give the CPU more time
+
+    resolution: 0.02 # changing this to be sharper (was 0.05)
+    # changing max_laser_range slightly just to see what it does
+    max_laser_range: 10.0 #only mark obstacles within 2m; rays beyond clear free space
+
+    # added this line to imlpement "negative trust", just to test. gotta be careful with glassy or shiny surfaces
+    inf_is_valid: true 
+    minimum_time_interval: 0.15 # decreased from 0.25 to 0.15 to maybe process scans faster during playback
     transform_timeout: 0.2
     tf_buffer_duration: 30.
     stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
     enable_interactive_mode: true
 
     # General Parameters
-    use_scan_matching: false
+     # switching this to true for now, turning it on forces the robot to compare current laser sans against the existing map to correct for wheel slipping
+    use_scan_matching: true
+    # switching this to true for now, this tells the algorithm to use the center of mass of the laser scan poitns for matching, which is more stable than picking random points
     use_scan_barycenter: true
-    minimum_travel_distance: 0.0
-    minimum_travel_heading: 0.0
-    scan_buffer_size: 20
-    scan_buffer_maximum_scan_distance: 2.0
+    # giving slight values to this so it stops the robot from constantly updating the map while its sitting or barely moving. 
+    # Constant updates while stationary can cause blurring to the map bc of sensor noise
+    minimum_travel_distance: 0.05
+    minimum_travel_heading: 0.05
+    scan_buffer_size: 15 # reducing from 20 to 15 to reduce processing lag
+    # changing this to match the max_laser_range
+    scan_buffer_maximum_scan_distance: 6.0
     link_match_minimum_response_fine: 0.1
     link_scan_maximum_distance: 1.5
-    loop_search_maximum_distance: 3.0
-    do_loop_closing: false
+
+    # changing to true, allows robot to recognize loops. 
+    do_loop_closing: true
     loop_match_minimum_chain_size: 10
     loop_match_maximum_variance_coarse: 3.0
     loop_match_minimum_response_coarse: 0.35
     loop_match_minimum_response_fine: 0.45
+    # increeasing max distanced from 3 to 4 just to see if it makes a difference
+    loop_search_maximum_distance: 4.0
 
     # Correlation Parameters - Correlation Parameters
     correlation_search_space_dimension: 0.5

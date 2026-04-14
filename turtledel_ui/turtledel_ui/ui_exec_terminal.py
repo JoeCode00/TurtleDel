@@ -337,6 +337,14 @@ class ui_node_class(Node):
                                         label="Play Bag",
                                         callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
 
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_text("RFID:")
+                                for i in range(0, 4):
+                                    data='{data: "rfid'+str(i)+'"}'
+                                    dpg.add_button(tag=f"RFID{i}",
+                                        label=str(i),
+                                        callback=self.command("pc_blocking", f"ros2 topic pub --once /rfid_goal std_msgs/msg/String '{data}'"))
+
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")
                             dpg.add_combo(tag="topic_selector",

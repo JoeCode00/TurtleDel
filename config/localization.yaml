@@ -13,9 +13,9 @@ amcl:
     do_beamskip: false
     global_frame_id: "map"
     lambda_short: 0.1
-    laser_likelihood_max_dist: 2.0
-    laser_max_range: 100.0
-    laser_min_range: -1.0
+    laser_likelihood_max_dist: 4.0 # changing this to 4.0 so it trust walls better
+    laser_max_range: 12.0 # 100 is crazy i dont think the lidar can even see past 12m
+    laser_min_range: 0.1 # changing this bc i dont think lidars can have a negative range? could be wrong. 
     laser_model_type: "likelihood_field"
     max_beams: 60
     max_particles: 2000
@@ -48,6 +48,6 @@ map_saver:
   ros__parameters:
     use_sim_time: True
     save_map_timeout: 5.0
-    free_thresh_default: 0.25
-    occupied_thresh_default: 0.65
+    free_thresh_default: 0.25 # MIGHT HAVE TO CHANGE THIS
+    occupied_thresh_default: 0.65 # MIGHT HAVDE TO CHANGE THIS so only very certain hits count as walls
     map_subscribe_transient_local: True

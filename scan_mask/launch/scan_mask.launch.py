@@ -14,10 +14,10 @@ def generate_launch_description():
             parameters=[{
                 'mask_angle_mid_deg': 90,
                 'mask_angle_width_deg': 20,
-                'mask_min_range_m': 0.2,
-                'mask_max_range_m': 5,
-                'range_inf_to_range_0': True,
-                'intensity_0_to_range_0': True, #(5/7)
+                'mask_min_range_m': 0.15, # changing this to match the LIDAR blind spot
+                'mask_max_range_m': 10, # increasing this bc 2m is way too close imo
+                'range_inf_to_range_0': False, # changing this to match the logic from the slam.yaml file
+                'intensity_0_to_range_0': False, #(5/7) # pretty sure if surface is too dark to reutn an intensity signal, we dont wanna mark it as a hit
 						    #fill with dict of parameters
             }],
             remappings=[
