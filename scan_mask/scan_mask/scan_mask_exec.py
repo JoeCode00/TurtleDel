@@ -88,17 +88,20 @@ class scan_mask_node_class(Node): # change node class name to <node_class>
             if self.mask_angle_min_rad < angle < self.mask_angle_max_rad:
                 ranges[index] = 0.0
                 intensities[index] = 0.0
+                
             # No-return readings (0 or inf): replace with range_max so SLAM
             # raytraces free space instead of ignoring the ray entirely
             elif r == 0.0 or math.isinf(r) or math.isnan(r):
-                ranges[index] = float(input_msg.range_max)
+                ranges[index] = float('inf') # Changing this to let SLAM handle the raytracing distance
+           
             # Too-close noise
             elif r < self.mask_min_range_m:
                 ranges[index] = 0.0
                 intensities[index] = 0.0
+            
             # Too-far readings: treat as no-return so SLAM raytraces free space
             elif r > self.mask_max_range_m:
-                ranges[index] = float(input_msg.range_max)
+                ranges[index] = float('inf') # changing this to inf to treat as free space
             # Valid readings: pass through unchanged
 
         output_msg.ranges = ranges
