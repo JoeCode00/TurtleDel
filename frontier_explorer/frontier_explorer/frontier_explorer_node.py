@@ -32,7 +32,7 @@ class FrontierExplorer(Node):
         self.declare_parameter('min_frontier_size', 15)
         self.declare_parameter('planner_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
-        self.declare_parameter('frontier_filter_radius', 10.0)
+        self.declare_parameter('frontier_filter_radius', 5.0)
 
         map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
         self.goal_timeout_sec = self.get_parameter('goal_timeout_sec').get_parameter_value().double_value
