@@ -17,7 +17,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from rclpy.node import Node
 from std_msgs.msg import String
 from sensor_msgs.msg import BatteryState, LaserScan, Image, Imu
-from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
+from geometry_msgs.msg import Twist, PoseWithCovarianceStamped, TransformStamped
 from tf2_msgs.msg import TFMessage
 from diagnostic_msgs.msg import DiagnosticArray
 from nav_msgs.msg import Odometry, OccupancyGrid
@@ -154,9 +154,9 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/rfid", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
-        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
@@ -247,6 +247,18 @@ class ui_node_class(Node):
                                         label="Rasberry Pi Restart",
                                         callback=self.command("ssh_blocking", 'sudo reboot'))
 
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                for i in range(0, 4):
+                                    self.status_indicator(f"rfid{i}", self)
+
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_text("RFID:")
+                                for i in range(0, 4):
+                                    data='{data: "rfid'+str(i)+'"}'
+                                    dpg.add_button(tag=f"RFID{i}",
+                                        label=str(i),
+                                        callback=self.command("pc_blocking", f"ros2 topic pub --once /rfid_goal std_msgs/msg/String '{data}'"))
+
                             for status_prefix in status_prefixes:
                                 with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                     self.status_indicator(status_prefix, self)
@@ -261,9 +273,14 @@ class ui_node_class(Node):
                                         callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
 
                             dpg.add_button(tag="restart_rfid",
-                                        label="Start RFID",
+                                        label="RFID Scan",
                                         before="/rfid_canvas",
                                         callback=self.command("ssh_rfid", "source /opt/ros/humble/setup.bash && cd ~/TurtleDel && source install/setup.bash && ros2 launch rfid rfid.launch.py"))
+                            
+                            dpg.add_button(tag="rfid_mgr_start",
+                                        label="RFID Manager",
+                                        before="/rfid_canvas",
+                                        callback=self.command("rfid_mgr", "ros2 launch rfid_waypoint_mgr rfid_waypoint_mgr.launch.py"))
 
                             dpg.add_button(tag="restart_oakd",
                                         label="Restart Camera",
@@ -319,13 +336,14 @@ class ui_node_class(Node):
                             dpg.add_button(tag="nav_start",
                                         label="Nav",
                                         before="/costmap_canvas",
-                                        callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py"))
+                                        callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py params_file:=/home/joseph/TurtleDel/config/nav2.yaml"))
 
                             dpg.add_button(tag="explore_start",
                                         label="Explore",
                                         before="/costmap_canvas",
                                         callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
-                            
+
+
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_button(tag="bag_record",
                                         label="Record Bag",
@@ -334,14 +352,6 @@ class ui_node_class(Node):
                                 dpg.add_button(tag="bag_play",
                                         label="Play Bag",
                                         callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
-
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                dpg.add_text("RFID:")
-                                for i in range(0, 4):
-                                    data='{data: "rfid'+str(i)+'"}'
-                                    dpg.add_button(tag=f"RFID{i}",
-                                        label=str(i),
-                                        callback=self.command("pc_blocking", f"ros2 topic pub --once /rfid_goal std_msgs/msg/String '{data}'"))
 
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")
@@ -388,11 +398,6 @@ class ui_node_class(Node):
             msg_type=DiagnosticArray,
             topic="/diagnostics_agg",
             )
-
-        # self.hazard_detection = self.topic_monitor(self,
-        #     msg_type=HazardDetectionVector,
-        #     topic="/hazard_detection",
-        #     )
         
         self.scan = self.topic_monitor(self,
             msg_type=LaserScan,
@@ -452,12 +457,37 @@ class ui_node_class(Node):
             tag="/costmap",
             )
         
+        self.tf_subscriber = self.create_subscription(
+            msg_type=TFMessage,
+            topic='/tf',
+            callback=self.tf_callback,
+            qos_profile=qos
+            )
+        
 
         self.create_timer(0.05, self.timer_callback)
 
         self.create_timer(1, self.ip_callback)
         
         self.create_timer(1, self.monitor_health_callback)
+
+    
+    def tf_callback(self, input_msg: TFMessage):
+        self.get_logger().info(f'Input: {str(input_msg)}')
+        for transform in input_msg.transforms:
+            if not isinstance(transform, TransformStamped):
+                continue
+            child_frame_id = transform.child_frame_id
+            if not isinstance(child_frame_id, str):
+                continue
+            if child_frame_id[:4] == 'rfid':
+                x = float(transform.transform.translation.x)
+                y = float(transform.transform.translation.y)
+                z = float(transform.transform.translation.z)
+                color = YELLOW
+                if x != 0 or y != 0 or z != 0:
+                    color = GREEN
+                dpg.configure_item(f"{child_frame_id}_status", color=color, fill=color)
 
     class status_indicator():
         def __init__(self, staus_prefix, node):
@@ -578,13 +608,6 @@ class ui_node_class(Node):
         self.terminal_procs[prefix].interrupt()
         self._terminal_print("[interrupted]", output_tag)
         dpg.focus_item(input_tag)
-
-    # def subscriber_callback(self, input_msg: input_msg_type):
-    #     self.get_logger().info(f'Input: {str(input_msg)}')
-    #     output_msg = output_msg_type()
-    #     output_msg = input_msg
-    #     self.node_publisher_.publish(output_msg)
-    #     self.get_logger().info(f'Output: {str(output_msg)}')
 
     def monitor_health_callback(self):
         """Check if topic monitors are receiving data within their max_interval_s threshold."""
