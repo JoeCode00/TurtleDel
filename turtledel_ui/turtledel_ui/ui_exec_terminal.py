@@ -473,7 +473,6 @@ class ui_node_class(Node):
 
     
     def tf_callback(self, input_msg: TFMessage):
-        self.get_logger().info(f'Input: {str(input_msg)}')
         for transform in input_msg.transforms:
             if not isinstance(transform, TransformStamped):
                 continue
