@@ -41,7 +41,12 @@ class rfid_node_class(Node): # change node class name to <node_class>
             
             output_msg = output_msg_type()
 
-            self.ser.write(bytes([0x0A, 0x4E, 0x31, 0x2C, 0x31, 0x41, 0x0D])) # Max gain
+            for i in range(10): #guarantee writing
+                self.ser.write(bytes([0x0A, 0x4E, 0x31, 0x2C, 0x31, 0x41, 0x0D])) # Max gain
+                time.sleep(0.25)
+            
+            time.sleep(1)
+            
             while True:
                 time.sleep(0.05)
                 self.ser.write(bytes([0x0A, 0x55, 0x30, 0x2C, 0x52, 0x31, 0x2C, 0x30, 0x2C, 0x31, 0x0D])) # Asks if any tags can be read
