@@ -26,7 +26,8 @@ setup(
     entry_points={
         'console_scripts': [
           "rfid_waypoint_mgr_exec = rfid_waypoint_mgr.rfid_waypoint_mgr_exec:main",
-          "rfid_faker = rfid_waypoint_mgr.rfid_faker:main",
+        #   "rfid_faker = rfid_waypoint_mgr.rfid_faker:main",
+          "rfid_joseph = rfid_waypoint_mgr.rfid_joseph:main",
         ],
     },
 )

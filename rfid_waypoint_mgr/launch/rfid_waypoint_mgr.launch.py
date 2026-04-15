@@ -18,10 +18,19 @@ def generate_launch_description():
             ],
             output='screen' # or 'log' if the node should not output
         ),
+        # Node(
+        #     package='rfid_waypoint_mgr', #(1/7)
+        #     executable='rfid_faker', #(2/7)
+        #     name='rfid_faker_node', #(3/7)
+        #     namespace='',  #(4/7)
+        #     parameters=[{}], #(5/7)
+        #     remappings=[], #(6/7) #(7/7)
+        #     output='screen' # or 'log' if the node should not output
+        # ),
         Node(
             package='rfid_waypoint_mgr', #(1/7)
-            executable='rfid_faker', #(2/7)
-            name='rfid_faker_node', #(3/7)
+            executable='rfid_joseph', #(2/7)
+            name='rfid_joseph_node', #(3/7)
             namespace='',  #(4/7)
             parameters=[{}], #(5/7)
             remappings=[], #(6/7) #(7/7)
