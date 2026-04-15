@@ -154,7 +154,7 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/oakd", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
@@ -282,16 +282,6 @@ class ui_node_class(Node):
                                         before="/rfid_canvas",
                                         callback=self.command("rfid_mgr", "ros2 launch rfid_waypoint_mgr rfid_waypoint_mgr.launch.py"))
 
-                            dpg.add_button(tag="restart_oakd",
-                                        label="Restart Camera",
-                                        before="/oakd_canvas",
-                                        callback=self.command("ssh_blocking", "source /opt/ros/humble/setup.bash && ros2 service call /oakd/start_camera std_srvs/srv/Trigger \{\}"))
-                            
-                            dpg.add_button(tag="show_oakd",
-                                        label="Show Camera",
-                                        before="/oakd_canvas",
-                                        callback=self.command("rqt", "ros2 run rqt_image_view rqt_image_view /oakd/rgb/preview/image_raw"))
-
                             dpg.add_button(tag="undock",
                                         label="Undock",
                                         before="/dock_status_canvas",
@@ -347,7 +337,7 @@ class ui_node_class(Node):
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_button(tag="bag_record",
                                         label="Record Bag",
-                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --exclude "/map|/oakd/rgb/preview/image_raw" --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
+                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
                                 
                                 dpg.add_button(tag="bag_play",
                                         label="Play Bag",
@@ -428,12 +418,6 @@ class ui_node_class(Node):
             msg_type=String,
             topic="/rfid",
             max_interval_s = 60,
-            )
-
-        self.oakd = self.topic_monitor(self,
-            msg_type=Image,
-            topic="/oakd/rgb/preview/image_raw",
-            tag="/oakd",
             )
         
         self.dock_status = self.topic_monitor(self,
@@ -620,7 +604,6 @@ class ui_node_class(Node):
             self.tf,
             self.scan_masked,
             self.rfid,
-            self.oakd,
             self.dock_status,
             self.cmd_vel,
             self.map,
@@ -757,7 +740,6 @@ class ui_node_class(Node):
                     return isinstance(ranges, array.array)
 
                 case "/rfid": return isinstance(self.input_msg, String)
-                case "/oakd/rgb/preview/image_raw": return isinstance(self.input_msg, Image)
                 case "/dock_status":
                     if not isinstance(self.input_msg, DockStatus):
                         return False
