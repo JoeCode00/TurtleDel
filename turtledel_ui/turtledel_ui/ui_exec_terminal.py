@@ -154,7 +154,7 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/scan_masked", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
@@ -237,15 +237,20 @@ class ui_node_class(Node):
                                            callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "eduroam"'))
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                dpg.add_button(tag="create3_restart",
-                                        label="Create3 Restart",
-                                        callback=self.command("pc_blocking", 'curl -s -X POST http://192.168.1.3:8080/api/restart-app'))
+                                dpg.add_button(tag="ros2_restart",
+                                        label="ROS2 Restart",
+                                        callback=self.command("pc_blocking", 'ros2 daemon stop && ros2 daemon start'))
                                 dpg.add_button(tag="turtlebot_restart",
                                         label="Turtlebot Restart",
                                         callback=self.command("ssh_blocking", 'sudo systemctl restart turtlebot4.service'))
+                                dpg.add_button(tag="create3_restart",
+                                        label="Create3 Restart",
+                                        callback=self.command("pc_blocking", 'curl -s -X POST http://192.168.1.3:8080/api/restart-app'))
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_text("Timestamp Issues: ")
                                 dpg.add_button(tag="rpi_restart",
                                         label="Rasberry Pi Restart",
-                                        callback=self.command("ssh_blocking", 'sudo reboot'))
+                                        callback=self.command("ssh_blocking", 'sudo date -s "$(date)" && sudo reboot'))
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 for i in range(0, 4):
@@ -267,10 +272,10 @@ class ui_node_class(Node):
                                          tag="battery_percent_text",
                                          before="/battery_state_text")
                             
-                            dpg.add_button(tag="scan_mask_node_start",
-                                        label="Start Masking",
-                                        before="/scan_masked_canvas",
-                                        callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
+                            # dpg.add_button(tag="scan_mask_node_start",
+                            #             label="Start Masking",
+                            #             before="/scan_masked_canvas",
+                            #             callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
 
                             dpg.add_button(tag="restart_rfid",
                                         label="RFID Scan",
@@ -291,16 +296,16 @@ class ui_node_class(Node):
                                         label="Dock",
                                         before="/dock_status_canvas",
                                         callback=self.command("pc_blocking", "ros2 action send_goal /dock irobot_create_msgs/action/Dock \{\}"))
-
-                            dpg.add_button(tag="autonomy_start",
-                                        label="Autonomy",
-                                        before="/cmd_vel_canvas",
-                                        callback=self.command("", ""))
                             
                             dpg.add_button(tag="teleop_start",
                                         label="TeleOp",
                                         before="/cmd_vel_canvas",
                                         callback=self.command("external", "ros2 run teleop_twist_keyboard teleop_twist_keyboard"))
+
+                            dpg.add_button(tag="explore_start",
+                                        label="Explore",
+                                        before="/cmd_vel_canvas",
+                                        callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
 
                             dpg.add_button(tag="rviz_start",
                                         label="RViz",
@@ -310,7 +315,7 @@ class ui_node_class(Node):
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
                                         before="/map_canvas",
-                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=true"))
+                                        callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                             
                             dpg.add_button(tag="save_map",
                                         label="Save Map",
@@ -327,12 +332,6 @@ class ui_node_class(Node):
                                         label="Nav",
                                         before="/costmap_canvas",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py params_file:=/home/joseph/TurtleDel/config/nav2.yaml"))
-
-                            dpg.add_button(tag="explore_start",
-                                        label="Explore",
-                                        before="/costmap_canvas",
-                                        callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
-
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_button(tag="bag_record",
@@ -409,10 +408,10 @@ class ui_node_class(Node):
             topic="/tf",
             )
         
-        self.scan_masked = self.topic_monitor(self,
-            msg_type=LaserScan,
-            topic="/scan_masked",
-            )
+        # self.scan_masked = self.topic_monitor(self,
+        #     msg_type=LaserScan,
+        #     topic="/scan_masked",
+        #     )
         
         self.rfid = self.topic_monitor(self,
             msg_type=String,
@@ -602,7 +601,7 @@ class ui_node_class(Node):
             self.odom,
             self.imu,
             self.tf,
-            self.scan_masked,
+            # self.scan_masked,
             self.rfid,
             self.dock_status,
             self.cmd_vel,
