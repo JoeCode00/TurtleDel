@@ -37,14 +37,17 @@ class rfid_joseph_node_class(Node):
             qos_profile=qos
         )
         
-        self.current_pose = self.make_pose()
+        self.current_pose = None
         self.pose_dict = {}
 
         self.create_timer(0.1, self.broadcast_poses)
 
     def rfid_callback(self, input_msg: String):
         id = input_msg.data
-        if not self.pose_dict[id]:
+        if self.current_pose is None:
+            return
+
+        if id not in self.pose_dict.keys():
             sample_count = 1
             updated_pose = self.current_pose
         else:
@@ -101,24 +104,32 @@ class rfid_joseph_node_class(Node):
         """
         q0 = self.unit_vector(quat0[:4])
         q1 = self.unit_vector(quat1[:4])
-        d = np.dot(q0.flatten(), q1.flatten())
+        d = np.clip(np.dot(q0.flatten(), q1.flatten()), -1.0, 1.0)
         angle = math.acos(d)
 
+        if abs(angle) < 1e-10:
+            return q0
+
         q_slerp = (np.sin((1 - mu) * angle) / np.sin(angle)) * q0 + (np.sin(mu * angle) / np.sin(angle)) * q1
+
+        for i in range(4):
+            if np.isnan(q_slerp[i]):
+                raise ValueError(f"q_slerp {q_slerp} has a nan, quat0 = {quat0}, quat1 = {quat1}, mu = {mu}, q0 = {q0}, q1 = {q1}, d = {d},  angle = {angle}")
 
         return q_slerp
 
     def average_pose(self, old_pose:PoseWithCovarianceStamped, new_pose:PoseWithCovarianceStamped, sample_count:int|float):
         mu = 1/sample_count
-        p_old = [old_pose.pose.pose.position.x, old_pose.pose.pose.position.y, old_pose.pose.pose.position.z]
-        p_new = [new_pose.pose.pose.position.x, new_pose.pose.pose.position.y, new_pose.pose.pose.position.z]
+        p_old = np.array([old_pose.pose.pose.position.x, old_pose.pose.pose.position.y, old_pose.pose.pose.position.z])
+        p_new = np.array([new_pose.pose.pose.position.x, new_pose.pose.pose.position.y, new_pose.pose.pose.position.z])
         p_updated = (p_new-p_old)*mu+p_old
 
-        quat_old = np.array([old_pose.pose.pose.orientation.x, old_pose.pose.pose.orientation.y, old_pose.pose.pose.orientation.z, old_pose.pose.pose.orientation.w]).transpose
-        quat_new = np.array([new_pose.pose.pose.orientation.x, new_pose.pose.pose.orientation.y, new_pose.pose.pose.orientation.z, new_pose.pose.pose.orientation.w]).transpose
+        quat_old = np.array([old_pose.pose.pose.orientation.x, old_pose.pose.pose.orientation.y, old_pose.pose.pose.orientation.z, old_pose.pose.pose.orientation.w]).transpose()
+        quat_new = np.array([new_pose.pose.pose.orientation.x, new_pose.pose.pose.orientation.y, new_pose.pose.pose.orientation.z, new_pose.pose.pose.orientation.w]).transpose()
         
         
         q_updated = self.quaternion_slerp(quat_old, quat_new, mu).flatten().tolist()
+        
         return self.make_pose(px=p_updated[0], py=p_updated[1], pz=p_updated[2], qx=q_updated[0], qy=q_updated[1], qz=q_updated[2], qw=q_updated[3])
 
     def broadcast_poses(self):
