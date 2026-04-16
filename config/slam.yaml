@@ -27,7 +27,7 @@ slam_toolbox:
     max_laser_range: 5.0 #only mark obstacles within 2m; rays beyond clear free space
 
     # added this line to imlpement "negative trust", just to test. gotta be careful with glassy or shiny surfaces
-    inf_is_valid: true 
+    inf_is_valid: false 
     minimum_time_interval: 0.15 # decreased from 0.25 to 0.15 to maybe process scans faster during playback
     transform_timeout: 0.2
     tf_buffer_duration: 30.

@@ -117,7 +117,7 @@ class FrontierExplorer(Node):
             self.get_logger().warn('No valid frontier goal selected.')
             return
 
-        self.send_goal(goal)
+        self.send_goal(goal, robot_pose=robot_pose)
 
     def get_robot_pose(self):
         """
@@ -370,7 +370,7 @@ class FrontierExplorer(Node):
         wy = origin_y + (my + 0.5) * resolution
         return wx, wy
 
-    def send_goal(self, goal_xy, attempt_number=1):
+    def send_goal(self, goal_xy, attempt_number=1, robot_pose=None):
         """
         Send a navigation goal to the Nav2 action server.
         """
@@ -384,6 +384,16 @@ class FrontierExplorer(Node):
         self.goal_sequence += 1
         goal_id = self.goal_sequence
 
+        # Compute approach heading: point from robot toward the frontier goal.
+        # This avoids a final in-place spin at arrival since the robot is already
+        # facing the right direction as it approaches.
+        if robot_pose is not None:
+            yaw = math.atan2(goal_xy[1] - robot_pose[1], goal_xy[0] - robot_pose[0])
+        else:
+            yaw = 0.0
+        qz = math.sin(yaw / 2.0)
+        qw = math.cos(yaw / 2.0)
+
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = PoseStamped()
         goal_msg.pose.header.frame_id = self.planner_frame
@@ -391,7 +401,8 @@ class FrontierExplorer(Node):
         goal_msg.pose.pose.position.x = goal_xy[0]
         goal_msg.pose.pose.position.y = goal_xy[1]
         goal_msg.pose.pose.position.z = 0.0
-        goal_msg.pose.pose.orientation.w = 1.0
+        goal_msg.pose.pose.orientation.z = qz
+        goal_msg.pose.pose.orientation.w = qw
 
         self.current_goal_handle = None
         self.current_goal_id = goal_id
