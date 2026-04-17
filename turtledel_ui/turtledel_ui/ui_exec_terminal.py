@@ -421,6 +421,7 @@ class ui_node_class(Node):
             msg_type=String,
             topic="/rfid",
             max_interval_s = 60,
+            print_interval = 0.0,
             )
         
         self.dock_status = self.topic_monitor(self,
@@ -633,7 +634,7 @@ class ui_node_class(Node):
             dpg.configure_item(f"{monitor.tag}_status", color=color, fill=color)
     
     class topic_monitor():
-        def __init__(self, node, msg_type, topic, tag = None, qos_profile = qos, max_interval_s = 10):
+        def __init__(self, node, msg_type, topic, tag = None, qos_profile = qos, max_interval_s = 10, print_interval = 0.05):
             self.subscription = node.create_subscription(
                 msg_type=msg_type,
                 topic=topic,
@@ -659,7 +660,7 @@ class ui_node_class(Node):
             self.terminal_tag = f"{self.tag}_output_terminal"
             self.tab_tag = f"{self.tag}_tab"
             self._last_print_time = None
-            self._print_interval = 1.0
+            self._print_interval = print_interval
 
         def subscription_callback(self, input_msg):
             self.input_msg = input_msg
