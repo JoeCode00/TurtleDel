@@ -29,7 +29,8 @@ slam_toolbox:
     # added this line to imlpement "negative trust", just to test. gotta be careful with glassy or shiny surfaces
     inf_is_valid: false 
     minimum_time_interval: 0.15 # decreased from 0.25 to 0.15 to maybe process scans faster during playback
-    transform_timeout: 0.2
+    transform_timeout: 1.0 # increased from 0.5: odom has max gaps of ~0.774s so needs to exceed that
+    message_filter_queue_size: 30 # increased from default 10 to reduce drops while waiting for odom TF
     tf_buffer_duration: 30.
     stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
     enable_interactive_mode: true

@@ -248,17 +248,20 @@ class ui_node_class(Node):
                                         callback=self.command("pc_blocking", 'curl -s -X POST http://192.168.1.3:8080/api/restart-app'))
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_text("Timestamp Issues: ")
-                                dpg.add_button(tag="rpi_restart",
-                                        label="Rasberry Pi Restart",
-                                        callback=self.command("ssh_blocking", 'sudo date -s "$(date)" && sudo reboot'))
+                                dpg.add_button(tag="rpi_time_restart",
+                                        label="Rasberry Pi Time Restart",
+                                        callback=lambda s=None, a=None: self.command("ssh_blocking", 'sudo date -s "' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + '" && sudo systemctl restart chrony && sudo systemctl restart turtlebot4.service && date')(s, a))
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for i in range(0, 4):
+                                for i in range(0, 5):
+                                    self.status_indicator(f"rfid{i}", self)
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                for i in range(5, 10):
                                     self.status_indicator(f"rfid{i}", self)
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                 dpg.add_text("RFID:")
-                                for i in range(0, 4):
+                                for i in range(0, 10):
                                     data='{data: "rfid'+str(i)+'"}'
                                     dpg.add_button(tag=f"RFID{i}",
                                         label=str(i),
@@ -366,6 +369,7 @@ class ui_node_class(Node):
                             self.terminal_tab_class(terminal_prefix, self)
                         self.command("ssh_blocking", "ssh ubuntu@192.168.1.3")() #initialize ssh
                         self.command("ssh_rfid", "ssh ubuntu@192.168.1.3")() #initialize ssh
+                        self.command("ssh_blocking", "date")() #check date is not 2024
 
         with dpg.theme() as terminal_theme:
             with dpg.theme_component(dpg.mvAll):
@@ -469,7 +473,10 @@ class ui_node_class(Node):
                 color = YELLOW
                 if x != 0 or y != 0 or z != 0:
                     color = GREEN
-                dpg.configure_item(f"{child_frame_id}_status", color=color, fill=color)
+                try:
+                    dpg.configure_item(f"{child_frame_id}_status", color=color, fill=color)
+                except:
+                    pass
 
     class status_indicator():
         def __init__(self, staus_prefix, node):

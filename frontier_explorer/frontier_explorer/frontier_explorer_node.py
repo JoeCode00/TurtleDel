@@ -29,10 +29,10 @@ class FrontierExplorer(Node):
         self.declare_parameter('map_topic', '/map')
         self.declare_parameter('goal_timeout_sec', 20.0) #really agressive timeout
         self.declare_parameter('goal_max_reattempts', 0)
-        self.declare_parameter('min_frontier_size', 15)
+        self.declare_parameter('min_frontier_size', 20)
         self.declare_parameter('planner_frame', 'map')
         self.declare_parameter('robot_frame', 'base_link')
-        self.declare_parameter('frontier_filter_radius', 5.0)
+        # self.declare_parameter('frontier_filter_radius', 5.0)
 
         map_topic = self.get_parameter('map_topic').get_parameter_value().string_value
         self.goal_timeout_sec = self.get_parameter('goal_timeout_sec').get_parameter_value().double_value
@@ -40,7 +40,7 @@ class FrontierExplorer(Node):
         self.min_frontier_size = self.get_parameter('min_frontier_size').get_parameter_value().integer_value
         self.planner_frame = self.get_parameter('planner_frame').get_parameter_value().string_value
         self.robot_frame = self.get_parameter('robot_frame').get_parameter_value().string_value
-        self.frontier_filter_radius = self.get_parameter('frontier_filter_radius').get_parameter_value().double_value
+        # self.frontier_filter_radius = self.get_parameter('frontier_filter_radius').get_parameter_value().double_value
 
         # Initialize variables for map data, goal handling, and exploration state
         self.map_msg = None
@@ -223,9 +223,9 @@ class FrontierExplorer(Node):
             wx, wy = self.cluster_centroid_to_world(cluster, self.map_msg)
             if self.is_goal_blacklisted((wx, wy)):
                 continue
-            if self.frontier_filter_radius > 0.0:
-                if math.hypot(wx, wy) > self.frontier_filter_radius:
-                    continue
+            # if self.frontier_filter_radius > 0.0:
+            #     if math.hypot(wx, wy) > self.frontier_filter_radius:
+            #         continue
             dist = math.hypot(wx - robot_pose[0], wy - robot_pose[1])
 
             # Score is based on distance and cluster size
