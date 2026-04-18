@@ -40,13 +40,14 @@ class RFIDFinder(Node):
 
     def req_callback(self, msg):
         # publish the pose on /rfid_pose
-        msg_pub = PoseWithCovarianceStamped
+        msg_pub = PoseWithCovarianceStamped()
+        print("\nRequest Received: " + str(msg.data))
         if msg.data in self.best_pose:
-            msg_pub.data = self.best_pose[msg.data]["pose"] 
+            msg_pub = self.best_pose[msg.data]["pose"] 
+            print("\nPublishing Pose")
             self.rfid_publisher_.publish(msg_pub)
-        # msg_pub = String()
-        # msg_pub.data = json.dumps(self.best_pose)
-        # self.rfid_publisher_.publish(msg_pub)
+        else:
+            print("\nRFID requested not found in dictionary")
 
 
     def reset(self, pose_set):
