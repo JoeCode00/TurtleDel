@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+import tf2_ros
 from std_msgs.msg import String
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import TransformStamped, PoseWithCovarianceStamped
 import time
-import json
 
 pose_translation_threshold = 0.005
 pose_rotation_threshold = 0.005
@@ -13,12 +13,11 @@ rfid_min_signals = 10
 class RFIDFinder(Node):
     def __init__(self):
         super().__init__("rfid_finder_node")
-        self.rfid_subscriber_ = self.create_subscription(String, "/rfid", self.rfid_callback, 10)   # Type, Topic, Callback, Buffer size
-        self.rfid_subscriber_ = self.create_subscription(PoseWithCovarianceStamped, "/pose", self.pose_callback, 10) 
-        self.rfid_subscriber_ = self.create_subscription(String, "/rfid_req", self.req_callback, 10) 
-        # self.rfid_publisher_ = self.create_publisher(String, "/rfid_rfid", 10)
-        self.rfid_publisher_ = self.create_publisher(PoseWithCovarianceStamped, "/rfid_pose", 10)
-        # self.subscription
+        self.get_logger().info('init rfid_finder_node')
+        self.rfid_subscriber_ = self.create_subscription(String, "/rfid", self.rfid_callback, 10)
+        self.pose_subscriber_ = self.create_subscription(PoseWithCovarianceStamped, "/pose", self.pose_callback, 10)
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
+        self.create_timer(0.1, self.broadcast_poses)
         self.best_pose = {}
         self.reset_flag = False
 
@@ -38,28 +37,30 @@ class RFIDFinder(Node):
         self.z_prev = None
 
 
-    def req_callback(self, msg):
-        # publish the pose on /rfid_pose
-        msg_pub = PoseWithCovarianceStamped()
-        print("\nRequest Received: " + str(msg.data))
-        if msg.data in self.best_pose:
-            msg_pub = self.best_pose[msg.data]["pose"] 
-            print("\nPublishing Pose")
-            self.rfid_publisher_.publish(msg_pub)
-        else:
-            print("\nRFID requested not found in dictionary")
-
+    def broadcast_poses(self):
+        for i, id in enumerate(self.best_pose.keys()):
+            pose = self.best_pose[id]["pose"]
+            t = TransformStamped()
+            t.header.stamp = self.get_clock().now().to_msg()
+            t.header.frame_id = 'map'
+            t.child_frame_id = f"rfid{i}"
+            t.transform.translation.x = pose.pose.pose.position.x
+            t.transform.translation.y = pose.pose.pose.position.y
+            t.transform.translation.z = pose.pose.pose.position.z
+            t.transform.rotation = pose.pose.pose.orientation
+            self.tf_broadcaster.sendTransform(t)
 
     def reset(self, pose_set):
-        
-        if (self.rfid_save):
+        rfid_to_save = self.rfid_save if self.rfid_save else self.rfid_prev
+
+        if rfid_to_save:
             ave = 100.0 # practically infinity
             if len(self.deltas_t) >= rfid_min_signals:
                 self.deltas_t.pop() # remove last time delta so as not to skew the average
                 ave = sum(self.deltas_t) / len(self.deltas_t)
         
             if self.rfid_save not in self.best_pose:
-                self.best_pose[self.rfid_save] = {"time_period": ave, "pose": pose_set}
+                self.best_pose[rfid_to_save] = {"time_period": ave, "pose": pose_set}
                 print("\n\nNEW RFID")
                 for k, v in self.best_pose.items():    
                     print(f"{k}:")    
@@ -69,9 +70,9 @@ class RFIDFinder(Node):
                     else:        
                         print(f"  {v}")
             else:
-                if ave < self.best_pose[self.rfid_save]["time_period"]:
-                    self.best_pose[self.rfid_save] = {"time_period": ave, "pose": pose_set}
-                    print("\n\nBetter Pose found for RFID = " + str(self.rfid_save))
+                if ave < self.best_pose[rfid_to_save]["time_period"]:
+                    self.best_pose[rfid_to_save] = {"time_period": ave, "pose": pose_set}
+                    print("\n\nBetter Pose found for RFID = " + str(rfid_to_save))
                     for k, v in self.best_pose.items():    
                         print(f"{k}:")    
                         if isinstance(v, dict):        
@@ -87,6 +88,7 @@ class RFIDFinder(Node):
         self.y_prev = None
         self.z_prev = None
         self.rfid_save = None
+        self.deltas_t = []
         self.reset_flag = False
 
     def pose_callback(self, msg):

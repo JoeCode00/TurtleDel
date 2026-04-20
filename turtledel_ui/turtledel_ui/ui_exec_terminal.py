@@ -345,6 +345,10 @@ class ui_node_class(Node):
                                 dpg.add_button(tag="bag_play",
                                         label="Play Bag",
                                         callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
+                                
+                                dpg.add_button(tag="rqt_graph",
+                                        label="RQT Graph",
+                                        callback=self.command("rqt", "rqt_graph"))
 
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")

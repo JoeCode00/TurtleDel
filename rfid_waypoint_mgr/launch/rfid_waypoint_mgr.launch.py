@@ -29,8 +29,8 @@ def generate_launch_description():
         # ),
         Node(
             package='rfid_waypoint_mgr', #(1/7)
-            executable='rfid_joseph', #(2/7)
-            name='rfid_joseph_node', #(3/7)
+            executable='rfid_finder_node', #(2/7)
+            name='rfid_finder_node', #(3/7)
             namespace='',  #(4/7)
             parameters=[{}], #(5/7)
             remappings=[], #(6/7) #(7/7)
