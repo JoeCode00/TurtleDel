@@ -318,6 +318,7 @@ class ui_node_class(Node):
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
                                         before="/map_canvas",
+                                        # callback=self.command("slam", "python3 $HOME/TurtleDel/odom_tf_broadcaster.py & ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                                         callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                             
                             dpg.add_button(tag="save_map",
