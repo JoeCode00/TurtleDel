@@ -156,7 +156,7 @@ class ui_node_class(Node):
 
         self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/dock_status", "/cmd_vel", "/map", "/costmap"]
         status_prefixes = self.status_prefixes
-        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag','scan_mask_node', 'ssh_blocking', 'ssh_rfid']
+        compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
         self.output_queue = queue.Queue()
         self.terminal_procs = {
