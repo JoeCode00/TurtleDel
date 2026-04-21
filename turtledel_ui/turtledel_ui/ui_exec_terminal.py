@@ -167,7 +167,7 @@ class ui_node_class(Node):
 
         dpg.create_context()
         self.viewport_width = int(1920/2)
-        self.viewport_height = 1000
+        self.viewport_height = 1100
         self.padding = 10
         dpg.create_viewport(title='TurtleDel',
                             width=self.viewport_width,
@@ -326,6 +326,11 @@ class ui_node_class(Node):
                                         before="/map_canvas",
                                         callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/TurtleDel/map"))
                             
+                            dpg.add_button(tag="view_map",
+                                        label="View Map",
+                                        before="/map_canvas",
+                                        callback=self.command("external", "xdg-open $HOME/TurtleDel/map.pgm"))
+                            
 
                             dpg.add_button(tag="localize_start",
                                         label="Localize",
@@ -378,9 +383,9 @@ class ui_node_class(Node):
 
         with dpg.theme() as terminal_theme:
             with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 0, 0)
-                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 0, 0)
-                dpg.add_theme_style(dpg.mvStyleVar_CellPadding, 0, 0)
+                dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 0, 1)
+                dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 0, 1)
+                dpg.add_theme_style(dpg.mvStyleVar_CellPadding, 0, 1)
         for terminal_prefix in terminal_prefixes:
             dpg.bind_item_theme(f"{terminal_prefix}_output_terminal", terminal_theme)
 
