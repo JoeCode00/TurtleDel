@@ -93,7 +93,7 @@ class RFIDFinder(Node):
         self.reset_flag = False
 
     def pose_callback(self, msg):
-        if self.x_prev is not None:
+        if self.x_prev is not None and self.y_prev is not None:
             x_diff = abs(msg.pose.pose.position.x) - abs(self.x_prev)
             y_diff = abs(msg.pose.pose.position.y) - abs(self.y_prev)
             w_diff = abs(msg.pose.pose.orientation.w) - abs(self.w_prev)
