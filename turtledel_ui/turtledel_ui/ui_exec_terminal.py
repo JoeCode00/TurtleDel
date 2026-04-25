@@ -301,12 +301,12 @@ class ui_node_class(Node):
                             dpg.add_button(tag="undock",
                                         label="Undock",
                                         before="/dock_status_canvas",
-                                        callback=self.command("pc_blocking", "ros2 action send_goal /undock irobot_create_msgs/action/Undock \{\}"))
+                                        callback=self.command("pc_blocking", "ros2 action send_goal /undock irobot_create_msgs/action/Undock {}"))
 
                             dpg.add_button(tag="dock",
                                         label="Dock",
                                         before="/dock_status_canvas",
-                                        callback=self.command("pc_blocking", "ros2 action send_goal /dock irobot_create_msgs/action/Dock \{\}"))
+                                        callback=self.command("pc_blocking", "ros2 action send_goal /dock irobot_create_msgs/action/Dock {}"))
                             
                             dpg.add_button(tag="teleop_start",
                                         label="TeleOp",
