@@ -39,11 +39,12 @@ class RFIDFinder(Node):
 
     def broadcast_poses(self):
         for i, id in enumerate(self.best_pose.keys()):
+            name = i
             pose = self.best_pose[id]["pose"]
             t = TransformStamped()
             t.header.stamp = self.get_clock().now().to_msg()
             t.header.frame_id = 'map'
-            t.child_frame_id = f"rfid{i}"
+            t.child_frame_id = f"rfid_{name}" #rfid_ prefix required by UI node to pick out RFID transforms from all of the transforms on /tf.
             t.transform.translation.x = pose.pose.pose.position.x
             t.transform.translation.y = pose.pose.pose.position.y
             t.transform.translation.z = pose.pose.pose.position.z

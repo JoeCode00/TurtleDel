@@ -502,8 +502,8 @@ class ui_node_class(Node):
             child_frame_id = transform.child_frame_id
             if not isinstance(child_frame_id, str):
                 continue
-            if child_frame_id[:2] == 'r_':
-                child_frame_name = child_frame_id[2:]
+            if child_frame_id[:5] == 'rfid_':
+                child_frame_name = child_frame_id[5:]
                 if child_frame_name not in self.rfid_names:
                     self.rfid_names.append(child_frame_name)
                     self.rfid_names.sort()
