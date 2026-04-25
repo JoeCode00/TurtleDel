@@ -25,7 +25,7 @@ class basic_node_class(Node): # change node class name to <node_class>
 
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        name = input("test: ")
+        name = input("name: ")
         self.get_logger().info(f'out: {name}')
         self.get_logger().info('after input')
 
