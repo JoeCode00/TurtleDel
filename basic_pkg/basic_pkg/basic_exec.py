@@ -25,6 +25,10 @@ class basic_node_class(Node): # change node class name to <node_class>
 
         self.basic_param = str(self.get_parameter('basic_param').value)
 
+        name = input("test: ")
+        self.get_logger().info(f'out: {name}')
+        self.get_logger().info('after input')
+
         self.node_subscriber_ = self.create_subscription(
             msg_type=input_msg_type,
             topic=relative_input_topic,
