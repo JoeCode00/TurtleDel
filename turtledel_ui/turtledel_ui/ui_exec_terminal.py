@@ -121,6 +121,12 @@ class TerminalProcess:
                         line, buf = buf.split(b'\n', 1)
                         text = _strip_ansi(line.decode('utf-8', errors='replace').rstrip('\r'))
                         self.output_queue.put((self.terminal_tag, text))
+                    # Flush partial line (e.g. input() prompts that have no trailing newline)
+                    if buf:
+                        text = _strip_ansi(buf.decode('utf-8', errors='replace').rstrip('\r'))
+                        if text:
+                            self.output_queue.put((self.terminal_tag, text))
+                            buf = b""
                 elif self.process is not None and self.process.poll() is not None:
                     break
         finally:
@@ -158,6 +164,9 @@ class ui_node_class(Node):
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
+        
+        self.rfid_names: list[str] = []
+        
         self.output_queue = queue.Queue()
         self.terminal_procs = {
             prefix: TerminalProcess(f"{prefix}_output_terminal", self.output_queue)
@@ -218,6 +227,20 @@ class ui_node_class(Node):
                                                callback=self.restart_callback,
                                                )
                                 dpg.add_text("TurtleDel: Group 2 User Interface")
+
+                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
+                                dpg.add_button(tag="bag_record",
+                                        label="Record Bag",
+                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
+                                
+                                dpg.add_button(tag="bag_play",
+                                        label="Play Bag",
+                                        callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
+                                
+                                dpg.add_button(tag="rqt_graph",
+                                        label="RQT Graph",
+                                        callback=self.command("rqt", "rqt_graph"))
+
                             dpg.add_text("System State:")
                             
                             connection_rows = [["WIFI", "RaspberryPi", "Create3"]]
@@ -252,21 +275,6 @@ class ui_node_class(Node):
                                         label="Rasberry Pi Time Restart",
                                         callback=lambda s=None, a=None: self.command("ssh_blocking", 'sudo date -s "' + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S') + '" && sudo systemctl restart chrony && sudo systemctl restart turtlebot4.service && date')(s, a))
 
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for i in range(0, 5):
-                                    self.status_indicator(f"rfid{i}", self)
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                for i in range(5, 10):
-                                    self.status_indicator(f"rfid{i}", self)
-
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                dpg.add_text("RFID:")
-                                for i in range(0, 10):
-                                    data='{data: "rfid'+str(i)+'"}'
-                                    dpg.add_button(tag=f"RFID{i}",
-                                        label=str(i),
-                                        callback=self.command("pc_blocking", f"ros2 topic pub --once /rfid_goal std_msgs/msg/String '{data}'"))
-
                             for status_prefix in status_prefixes:
                                 with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                     self.status_indicator(status_prefix, self)
@@ -288,7 +296,7 @@ class ui_node_class(Node):
                             dpg.add_button(tag="rfid_mgr_start",
                                         label="RFID Manager",
                                         before="/rfid_canvas",
-                                        callback=self.command("rfid_mgr", "ros2 launch rfid_waypoint_mgr rfid_waypoint_mgr.launch.py"))
+                                        callback=self.command("rfid_mgr", "ros2 run rfid_waypoint_mgr rfid_waypoint_mgr_exec"))
 
                             dpg.add_button(tag="undock",
                                         label="Undock",
@@ -341,26 +349,30 @@ class ui_node_class(Node):
                                         label="Nav",
                                         before="/costmap_canvas",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py params_file:=/home/joseph/TurtleDel/config/nav2.yaml"))
-
+                                
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                dpg.add_button(tag="bag_record",
-                                        label="Record Bag",
-                                        callback=self.command("bag", 'rm -rf $HOME/TurtleDel/turtledel_bag && ros2 bag record -o $HOME/TurtleDel/turtledel_bag -a --qos-profile-overrides-path $HOME/TurtleDel/config/bag_qos.yaml'))
-                                
-                                dpg.add_button(tag="bag_play",
-                                        label="Play Bag",
-                                        callback=self.command("bag", "ros2 bag play $HOME/TurtleDel/turtledel_bag --clock --qos-profile-overrides-path $HOME/TurtleDel/config/bag_play_qos.yaml"))
-                                
-                                dpg.add_button(tag="rqt_graph",
-                                        label="RQT Graph",
-                                        callback=self.command("rqt", "rqt_graph"))
+                                dpg.add_text("RFID:")
+                                if len(self.rfid_names) == 0:
+                                    default_value = ""
+                                else:
+                                    default_value = self.rfid_names[0]
+                                dpg.add_button(tag="rfid_nav",
+                                                label="Nav To",
+                                                callback=self.rfid_nav_request,
+                                                width=60)
+                            dpg.add_listbox(tag="rfid_name_selector",
+                                                items=self.rfid_names,
+                                                default_value=default_value,
+                                                width=-1,
+                                                num_items=4,
+                                                )
 
                         with dpg.child_window(width=-1, height=-1, border=True, tag="right_col"):
                             dpg.add_text("System Topics:")
                             dpg.add_combo(tag="topic_selector",
                                 items=status_prefixes,
                                 default_value=status_prefixes[0],
-                                callback=self._topic_select_callback,
+                                callback=self.topic_select_callback,
                                 width=-1)
                             for terminal_prefix in status_prefixes:
                                 visible = (terminal_prefix == status_prefixes[0])
@@ -462,13 +474,26 @@ class ui_node_class(Node):
             qos_profile=qos
             )
         
+        self.rfid_request_publisher = self.create_publisher(
+            msg_type = String, 
+            topic = "/rfid_goal",
+            qos_profile = qos
+            )
+        
 
         self.create_timer(0.05, self.timer_callback)
 
         self.create_timer(1, self.ip_callback)
         
         self.create_timer(1, self.monitor_health_callback)
-
+    
+    def rfid_nav_request(self, sender, app_data):
+        rfid_name = dpg.get_value("rfid_name_selector")
+        output_msg = String()
+        output_msg.data = str(rfid_name)
+        self.rfid_request_publisher.publish(output_msg)
+        # self.command("pc_blocking", f"ros2 topic pub --once /rfid_goal std_msgs/msg/String '{data}'"))
+        
     
     def tf_callback(self, input_msg: TFMessage):
         for transform in input_msg.transforms:
@@ -477,17 +502,14 @@ class ui_node_class(Node):
             child_frame_id = transform.child_frame_id
             if not isinstance(child_frame_id, str):
                 continue
-            if child_frame_id[:4] == 'rfid':
-                x = float(transform.transform.translation.x)
-                y = float(transform.transform.translation.y)
-                z = float(transform.transform.translation.z)
-                color = YELLOW
-                if x != 0 or y != 0 or z != 0:
-                    color = GREEN
-                try:
-                    dpg.configure_item(f"{child_frame_id}_status", color=color, fill=color)
-                except:
-                    pass
+            if child_frame_id[:2] == 'r_':
+                child_frame_name = child_frame_id[2:]
+                if child_frame_name not in self.rfid_names:
+                    self.rfid_names.append(child_frame_name)
+                    self.rfid_names.sort()
+                    dpg.configure_item("rfid_name_selector", items=self.rfid_names)
+                    if len(self.rfid_names) == 1:
+                        dpg.configure_item("rfid_name_selector", default_value=self.rfid_names[0])
 
     class status_indicator():
         def __init__(self, staus_prefix, node):
@@ -524,7 +546,7 @@ class ui_node_class(Node):
             self.command(terminal_prefix, command)(sender, app_data)
         return _callback
 
-    def _topic_select_callback(self, sender, app_data):
+    def topic_select_callback(self, sender, app_data):
         for prefix in self.status_prefixes:
             dpg.configure_item(f"{prefix}_topic_group", show=(prefix == app_data))
 
