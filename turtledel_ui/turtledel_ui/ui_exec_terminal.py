@@ -160,7 +160,7 @@ class ui_node_class(Node):
         self.declare_parameter('basic_param', 'basic_default')
         self.basic_param = str(self.get_parameter('basic_param').value)
 
-        self.status_prefixes = ["/rfid", "/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/dock_status", "/cmd_vel", "/map", "/costmap"]
+        self.status_prefixes = ["/battery_state", "/diagnostics_agg", "/scan", "/odom", "/imu", "/tf", "/dock_status", "/cmd_vel", "/map", "/costmap", "/rfid", "/rfid_goal"]
         status_prefixes = self.status_prefixes
         compute_prefixes = ['pc_blocking', 'rqt', 'rviz', 'slam', 'localize', 'nav', 'explore', 'rfid_mgr','bag', 'ssh_blocking', 'ssh_rfid']
         terminal_prefixes = compute_prefixes + status_prefixes
@@ -243,7 +243,7 @@ class ui_node_class(Node):
 
                             dpg.add_text("System State:")
                             
-                            connection_rows = [["WIFI", "RaspberryPi", "Create3"]]
+                            connection_rows = [["RaspberryPi", "Create3", "WIFI"]]
                             for row in connection_rows:
                                 with dpg.group(horizontal=True, horizontal_spacing=self.padding):
                                     for status_prefix in row:
@@ -251,12 +251,12 @@ class ui_node_class(Node):
 
                             dpg.add_button(tag="wifi_connect",
                                            label="Connect",
-                                           before="WIFI_canvas",
+                                           before="WIFI_right",
                                            callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "turtlebot-hub-5G"'))
                             
                             dpg.add_button(tag="wifi_disconnect",
                                            label="Disconnect",
-                                           before="WIFI_canvas",
+                                           before="WIFI_right",
                                            callback=self._network_change_command("pc_blocking", 'nmcli device wifi rescan && sleep 3 && nmcli device wifi connect "eduroam"'))
 
                             with dpg.group(horizontal=True, horizontal_spacing=self.padding):
@@ -285,81 +285,81 @@ class ui_node_class(Node):
                             
                             # dpg.add_button(tag="scan_mask_node_start",
                             #             label="Start Masking",
-                            #             before="/scan_masked_canvas",
+                            #             before="/scan_masked_right",
                             #             callback=self.command("scan_mask_node", "ros2 launch scan_mask scan_mask.launch.py"))
 
                             dpg.add_button(tag="restart_rfid",
                                         label="RFID Scan",
-                                        before="/rfid_canvas",
+                                        before="/rfid_right",
                                         callback=self.command("ssh_rfid", "source /opt/ros/humble/setup.bash && cd ~/TurtleDel && source install/setup.bash && ros2 launch rfid rfid.launch.py"))
                             
                             dpg.add_button(tag="rfid_mgr_start",
                                         label="RFID Manager",
-                                        before="/rfid_canvas",
+                                        before="/rfid_right",
                                         callback=self.command("rfid_mgr", "ros2 run rfid_waypoint_mgr rfid_waypoint_mgr_exec"))
 
                             dpg.add_button(tag="undock",
                                         label="Undock",
-                                        before="/dock_status_canvas",
+                                        before="/dock_status_right",
                                         callback=self.command("pc_blocking", "ros2 action send_goal /undock irobot_create_msgs/action/Undock {}"))
 
                             dpg.add_button(tag="dock",
                                         label="Dock",
-                                        before="/dock_status_canvas",
+                                        before="/dock_status_right",
                                         callback=self.command("pc_blocking", "ros2 action send_goal /dock irobot_create_msgs/action/Dock {}"))
                             
                             dpg.add_button(tag="teleop_start",
                                         label="TeleOp",
-                                        before="/cmd_vel_canvas",
+                                        before="/cmd_vel_right",
                                         callback=self.command("external", "ros2 run teleop_twist_keyboard teleop_twist_keyboard"))
 
                             dpg.add_button(tag="explore_start",
                                         label="Explore",
-                                        before="/cmd_vel_canvas",
+                                        before="/cmd_vel_right",
                                         callback=self.command("explore", "ros2 run frontier_explorer frontier_explorer_node"))
 
                             dpg.add_button(tag="rviz_start",
                                         label="RViz",
-                                        before="/map_canvas",
+                                        before="/map_right",
                                         callback=self.command("rviz", "rviz2 -d ~/TurtleDel/config/robot.rviz"))
                             
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
-                                        before="/map_canvas",
+                                        before="/map_right",
                                         # callback=self.command("slam", "python3 $HOME/TurtleDel/odom_tf_broadcaster.py & ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                                         callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                             
                             dpg.add_button(tag="save_map",
                                         label="Save Map",
-                                        before="/map_canvas",
+                                        before="/map_right",
                                         callback=self.command("pc_blocking", "ros2 run nav2_map_server map_saver_cli -f ~/TurtleDel/map"))
                             
                             dpg.add_button(tag="view_map",
                                         label="View Map",
-                                        before="/map_canvas",
+                                        before="/map_right",
                                         callback=self.command("external", "xdg-open $HOME/TurtleDel/map.pgm"))
                             
 
                             dpg.add_button(tag="localize_start",
                                         label="Localize",
-                                        before="/costmap_canvas",
+                                        before="/costmap_right",
                                         callback=self.command("localize", "ros2 launch turtlebot4_navigation localization.launch.py map:=$HOME/TurtleDel/map.yaml params:=$HOME/TurtleDel/config/localization.yaml"))
 
                             dpg.add_button(tag="nav_start",
                                         label="Nav",
-                                        before="/costmap_canvas",
+                                        before="/costmap_right",
                                         callback=self.command("nav", "ros2 launch turtlebot4_navigation nav2.launch.py params_file:=/home/joseph/TurtleDel/config/nav2.yaml"))
                                 
-                            with dpg.group(horizontal=True, horizontal_spacing=self.padding):
-                                dpg.add_text("RFID:")
-                                if len(self.rfid_names) == 0:
-                                    default_value = ""
-                                else:
-                                    default_value = self.rfid_names[0]
-                                dpg.add_button(tag="rfid_nav",
-                                                label="Nav To",
-                                                callback=self.rfid_nav_request,
-                                                width=60)
+                            
+                            if len(self.rfid_names) == 0:
+                                default_value = ""
+                            else:
+                                default_value = self.rfid_names[0]
+                            dpg.add_button(tag="rfid_nav",
+                                            label="Nav To",
+                                            before="/rfid_goal_right",
+                                            callback=self.rfid_nav_request,
+                                            width=60)
                             dpg.add_listbox(tag="rfid_name_selector",
                                                 items=self.rfid_names,
                                                 default_value=default_value,
@@ -474,6 +474,11 @@ class ui_node_class(Node):
             qos_profile=qos
             )
         
+        self.rfid_goal = self.topic_monitor(self,
+            msg_type=String,
+            topic="/rfid_goal",
+            )
+        
         self.rfid_request_publisher = self.create_publisher(
             msg_type = String, 
             topic = "/rfid_goal",
@@ -524,6 +529,7 @@ class ui_node_class(Node):
                                     label=f"{staus_prefix}"
                                     )
                 dpg.add_text(f"{staus_prefix}", tag=f"{staus_prefix}_text")
+                dpg.add_text("", tag=f"{staus_prefix}_right")
 
     def command(self, terminal_prefix: str, command: str):
         def _callback(sender=None, app_data=None):
@@ -647,6 +653,7 @@ class ui_node_class(Node):
             self.cmd_vel,
             self.map,
             self.costmap,
+            self.rfid_goal,
             ]
         
         current_time = datetime.now(tz=timezone.utc)
@@ -786,6 +793,7 @@ class ui_node_class(Node):
                 case '/cmd_vel': return isinstance(self.input_msg, Twist)
                 case '/map': return isinstance(self.input_msg, OccupancyGrid)
                 case '/local_costmap/costmap': return isinstance(self.input_msg, OccupancyGrid)
+                case '/rfid_goal': return isinstance(self.input_msg, String)
                 
 
         def seconds_between(self, older: datetime, newer: datetime) -> float:
