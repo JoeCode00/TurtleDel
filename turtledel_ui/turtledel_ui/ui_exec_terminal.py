@@ -176,7 +176,8 @@ class ui_node_class(Node):
 
         dpg.create_context()
         self.viewport_width = int(1920/2)
-        self.viewport_height = 1100
+        # self.viewport_height = 1100
+        self.viewport_height = 900
         self.padding = 10
         dpg.create_viewport(title='TurtleDel',
                             width=self.viewport_width,
@@ -296,7 +297,7 @@ class ui_node_class(Node):
                             dpg.add_button(tag="rfid_mgr_start",
                                         label="RFID Manager",
                                         before="/rfid_right",
-                                        callback=self.command("rfid_mgr", "ros2 run rfid_waypoint_mgr rfid_waypoint_mgr_exec"))
+                                        callback=self.command("rfid_mgr", "ros2 run rfid_waypoint_mgr rfid_handler_node"))
 
                             dpg.add_button(tag="undock",
                                         label="Undock",
