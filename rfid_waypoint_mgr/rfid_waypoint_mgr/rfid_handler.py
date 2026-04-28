@@ -7,8 +7,13 @@ from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped
 import tf2_ros
 from std_msgs.msg import String
-from geometry_msgs.msg import TransformStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
 import time
+import pickle
+import os
+
+PKL_PATH = os.path.join(os.path.dirname(__file__), 'rfid.pkl')
 
 pose_translation_threshold = 0.005
 pose_rotation_threshold = 0.005
@@ -33,7 +38,11 @@ class rfid_handler_node_class(Node): # change node class name to <node_class>
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.best_pose = {}
+        try:
+            with open(PKL_PATH, 'rb') as f:
+                self.best_pose = pickle.load(f)
+        except Exception:
+            self.best_pose = {}
         self.reset_flag = False
 
         # RFID
@@ -66,10 +75,10 @@ class rfid_handler_node_class(Node): # change node class name to <node_class>
             )
         
         self.pose_subscriber = self.create_subscription(
-            msg_type=PoseWithCovarianceStamped,
-            topic="/pose",
+            msg_type=Odometry,
+            topic="/odom",
             callback=self.pose_callback,
-            qos_profile=qos
+            qos_profile=qos_best_effort
             )
         
         self.goal_pose_publisher = self.create_publisher(
@@ -95,8 +104,25 @@ class rfid_handler_node_class(Node): # change node class name to <node_class>
             t.transform.rotation = pose.pose.pose.orientation
             self.tf_broadcaster.sendTransform(t)
 
-    def reset(self, pose_set: PoseWithCovarianceStamped):
+    def reset(self, pose_set: Odometry):
         rfid_to_save = self.rfid_save if self.rfid_save else self.rfid_prev
+
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                'map', 'base_link',
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5)
+            )
+            map_pose = Odometry()
+            map_pose.header.frame_id = 'map'
+            map_pose.pose.pose.position.x = transform.transform.translation.x
+            map_pose.pose.pose.position.y = transform.transform.translation.y
+            map_pose.pose.pose.position.z = transform.transform.translation.z
+            map_pose.pose.pose.orientation = transform.transform.rotation
+            pose_set = map_pose
+        except Exception as e:
+            self.get_logger().warn(f'Could not look up map→base_link TF; skipping pose save: {e}')
+            rfid_to_save = None
 
         if rfid_to_save:
             ave = 100.0 # practically infinity
@@ -140,11 +166,12 @@ class rfid_handler_node_class(Node): # change node class name to <node_class>
         self.deltas_t = []
         self.reset_flag = False
 
-    def pose_callback(self, msg: PoseWithCovarianceStamped):
-        if self.x_prev is not None and self.y_prev is not None:
-            x_diff = abs(msg.pose.pose.position.x) - abs(self.x_prev)
-            y_diff = abs(msg.pose.pose.position.y) - abs(self.y_prev)
-            w_diff = abs(msg.pose.pose.orientation.w) - abs(self.w_prev)
+    def pose_callback(self, msg: Odometry):
+        if self.x_prev is not None and self.y_prev is not None and self.w_prev is not None:
+            x_diff = abs(msg.pose.pose.position.x - self.x_prev)
+            y_diff = abs(msg.pose.pose.position.y - self.y_prev)
+            w_diff = abs(msg.pose.pose.orientation.w - self.w_prev)
+            # print(w_diff)
 
             if (x_diff > pose_translation_threshold): self.reset_flag = True
             if (y_diff > pose_translation_threshold): self.reset_flag = True
@@ -204,10 +231,16 @@ class rfid_handler_node_class(Node): # change node class name to <node_class>
         self.goal_pose_publisher.publish(output_msg)
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = rfid_handler_node_class()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.init(args=args)
+        node = rfid_handler_node_class()
+        rclpy.spin(node)
+        rclpy.shutdown()
+    except:
+        pass
+    print(f"poses: {node.best_pose}")
+    with open(PKL_PATH, 'wb') as f:
+        pickle.dump(node.best_pose, f)
     
 if __name__ == '__main__':
     main()

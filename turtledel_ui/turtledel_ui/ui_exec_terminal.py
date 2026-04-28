@@ -176,8 +176,7 @@ class ui_node_class(Node):
 
         dpg.create_context()
         self.viewport_width = int(1920/2)
-        # self.viewport_height = 1100
-        self.viewport_height = 900
+        self.viewport_height = 1080
         self.padding = 10
         dpg.create_viewport(title='TurtleDel',
                             width=self.viewport_width,
@@ -327,7 +326,6 @@ class ui_node_class(Node):
                             dpg.add_button(tag="slam_start",
                                         label="SLAM",
                                         before="/map_right",
-                                        # callback=self.command("slam", "python3 $HOME/TurtleDel/odom_tf_broadcaster.py & ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                                         callback=self.command("slam", "ros2 launch turtlebot4_navigation slam.launch.py params:=$HOME/TurtleDel/config/slam.yaml use_sim_time:=false"))
                             
                             dpg.add_button(tag="save_map",
@@ -592,6 +590,11 @@ class ui_node_class(Node):
         return len(label) * char_width + padding
 
     def exit_callback(self, sender, app_data):
+        for prefix, proc in self.terminal_procs.items():
+            if proc.is_running():
+                output_tag = f"{prefix}_output_terminal"
+                proc.interrupt()
+                self._terminal_print("[interrupted]", output_tag)
         dpg.stop_dearpygui()
         
     def restart_callback(self, sender, app_data):
